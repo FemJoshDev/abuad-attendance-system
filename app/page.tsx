@@ -1,8 +1,64 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { academicData, attendanceNotifications, attendanceRecords, courseAttendance, courses, overallAttendance, student } from "@/mock/academicData";
+import { signIn, signOut, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { academicData, attendanceNotifications, courses, student } from "@/mock/academicData";
 import type { Course, Semester } from "@/mock/academicData";
+import type { CourseSummary } from "@/src/types/course";
+
+type DashboardApiCourse = {
+  courseId: string;
+  courseCode: string;
+  courseTitle: string;
+  totalSessions: number;
+  present: number;
+  absent: number;
+  late: number;
+  excused: number;
+  attended: number;
+  eligibleSessions: number;
+  attendancePercentage: number | null;
+  threshold: number;
+  lowAttendance: boolean;
+  status: "Good standing" | "At risk" | "No data";
+};
+
+type DashboardApiData = {
+  student: {
+    id: string;
+    name: string;
+    email: string;
+    matricNumber: string | null;
+  };
+  overallAttendance: {
+    present: number;
+    absent: number;
+    late: number;
+    excused: number;
+    totalClasses: number;
+    attendedClasses: number;
+    attendancePercentage: number | null;
+    threshold: number;
+  };
+  courses: DashboardApiCourse[];
+  recentAttendance: Array<{
+    id: string;
+    courseCode: string;
+    courseTitle: string;
+    status: string;
+    date: string;
+    time: string;
+  }>;
+  warnings: Array<{
+    courseId: string;
+    courseCode: string;
+    courseTitle: string;
+    attendancePercentage: number;
+    threshold: number;
+    status: "LOW_ATTENDANCE";
+  }>;
+};
 
 type IconName = "grid" | "book" | "bell" | "alert" | "settings" | "logout" | "menu" | "close" | "eye" | "eye-off";
 const icons: Record<IconName, string> = { grid: "▦", book: "▤", bell: "♧", alert: "△", settings: "⚙", logout: "↪", menu: "☰", close: "×", eye: "◉", "eye-off": "⊘" };
@@ -11,8 +67,38 @@ function Brand({ compact = false }: { compact?: boolean }) { return <div classNa
 
 function LoginPage({ onLogin }: { onLogin: () => void }) {
   const [username, setUsername] = useState(""); const [password, setPassword] = useState(""); const [showPassword, setShowPassword] = useState(false); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
-  function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!username.trim() || !password.trim()) { setError("Enter your matric number and password to continue."); return; } setError(""); setLoading(true); window.setTimeout(() => { setLoading(false); onLogin(); }, 650); }
-  return <main className="login-page"><div className="login-photo" aria-hidden="true" /><div className="login-overlay" aria-hidden="true" /><section className="login-card" aria-label="Student login"><Brand /><div className="login-heading"><p className="eyebrow">STUDENT PORTAL</p><h1>ABUAD Attendance<br />Management System</h1><p>College of Medicine &amp; Health Sciences</p></div><form onSubmit={submit} noValidate><label htmlFor="username">Username / Matric Number</label><input id="username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. ABUAD/20/4521" autoComplete="username" /><label htmlFor="password">Password</label><div className="password-field"><input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password" /><button type="button" className="input-action" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"}><Icon name={showPassword ? "eye-off" : "eye"} /></button></div>{error && <p className="form-error" role="alert">{error}</p>}<button className="login-button" type="submit" disabled={loading}>{loading ? "Signing in..." : "Login"}</button><button type="button" className="forgot" onClick={() => setError("Please contact your college administrator to reset your password.")}>Forgot password?</button></form><div className="login-footer"><p>Developed by <strong>OJO JOSHUA OLUWAPELUMI</strong><span className="developer-nickname">PilotDev✈️ @2026</span></p><p>Courtesy of the Dean,<br />College of Medicine &amp; Health Sciences</p></div></section></main>;
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!username.trim() || !password.trim()) {
+      setError("Enter your email or matric number and password to continue.");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const result = await signIn("credentials", {
+        email: username.trim(),
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("Invalid email or password.");
+      } else {
+        onLogin();
+      }
+    } catch {
+      setError("Unable to sign in right now. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return <main className="login-page"><div className="login-photo" aria-hidden="true" /><div className="login-overlay" aria-hidden="true" /><section className="login-card" aria-label="Student login"><Brand /><div className="login-heading"><p className="eyebrow">STUDENT PORTAL</p><h1>ABUAD Attendance<br />Management System</h1><p>College of Medicine &amp; Health Sciences</p></div><form onSubmit={submit} noValidate><label htmlFor="username">Email or Matric Number</label><input id="username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="e.g. joshua.ojo@abuad.edu.ng or ABUAD/20/4521" autoComplete="username" /><label htmlFor="password">Password</label><div className="password-field"><input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password" /><button type="button" className="input-action" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"}><Icon name={showPassword ? "eye-off" : "eye"} /></button></div>{error && <p className="form-error" role="alert">{error}</p>}<button className="login-button" type="submit" disabled={loading}>{loading ? "Signing in..." : "Login"}</button><button type="button" className="forgot" onClick={() => setError("Please contact your college administrator to reset your password.")}>Forgot password?</button></form><div className="login-footer"><p>Developed by <strong>OJO JOSHUA OLUWAPELUMI</strong><span className="developer-nickname">PilotDev✈️ @2026</span></p><p>Courtesy of the Dean,<br />College of Medicine &amp; Health Sciences</p></div></section></main>;
 }
 
 const navItems: { label: string; icon: IconName; path: string }[] = [{ label: "Dashboard", icon: "grid", path: "/student/dashboard" }, { label: "My Courses", icon: "book", path: "/courses" }, { label: "Notifications", icon: "bell", path: "/notifications" }, { label: "Complaints", icon: "alert", path: "/complaints" }, { label: "Settings", icon: "settings", path: "/settings" }];
@@ -20,20 +106,124 @@ function navigate(path: string) { window.history.pushState({}, "", path); window
 function Navigation({ mobile = false, onClose, onLogout, currentPath = "/student/dashboard", unreadCount = 3 }: { mobile?: boolean; onClose?: () => void; onLogout: () => void; currentPath?: string; unreadCount?: number }) { return <nav className={mobile ? "mobile-nav" : "sidebar"} aria-label="Student navigation">{mobile && <button className="drawer-close" onClick={onClose} aria-label="Close navigation"><Icon name="close" /></button>}<Brand /><div className="nav-links">{navItems.map((item) => <button className={`nav-item ${currentPath === item.path || (item.path === "/settings" && currentPath.startsWith("/settings/")) ? "active" : ""}`} key={item.label} onClick={() => { navigate(item.path); onClose?.(); }} type="button"><Icon name={item.icon} /><span>{item.label}</span>{item.label === "Notifications" && unreadCount > 0 && <em className="nav-badge">{unreadCount}</em>}</button>)}</div><div className="sidebar-bottom"><div className="mini-profile"><div className="avatar avatar-small">JA</div><div><strong>{student.name}</strong><span>{student.matricNumber}</span></div></div><button className="logout" onClick={onLogout} type="button"><Icon name="logout" /> Logout</button></div></nav>; }
 function Avatar({ large = false }: { large?: boolean }) { return <div className={`avatar ${large ? "avatar-large" : ""}`} aria-label={`${student.name} profile photo`}>JA</div>; }
 function ProfileCard() { return <section className="profile-card card"><div className="profile-top"><div><p className="eyebrow">STUDENT PROFILE</p><h2>{student.name}</h2><p className="matric">Matric No: {student.matricNumber}</p></div><button className="avatar-button" type="button" aria-label="Change profile image"><Avatar large /><span>Change photo</span></button></div><div className="profile-details"><div><span>Level</span><strong>{student.level}</strong></div><div><span>Department</span><strong>{student.department}</strong></div><div><span>College</span><strong>{student.college}</strong></div></div></section>; }
-function OverallCard() { const percentage = courseAttendance(overallAttendance); return <section className="overall-card"><div className="card-kicker">SEMESTER OVERVIEW</div><h2>Overall Attendance</h2><div className="attendance-number"><strong>{percentage}</strong><span>%</span></div><div className="overall-bar"><span style={{ width: `${percentage}%` }} /></div><div className="overall-foot"><span><b>{overallAttendance.present}</b> Present</span><span><b>{overallAttendance.total}</b> Total Classes</span></div><p>Above the 75% attendance requirement</p></section>; }
-function CourseCard({ course }: { course: Course }) { const percentage = courseAttendance(course); return <button type="button" className="course-card" onClick={() => window.alert(`${course.code} details will be available in the next release.`)}><div className="course-title"><div><strong>{course.code}</strong><span>{course.title}</span></div><b>{percentage}%</b></div><div className="course-meta"><span>{course.present} / {course.total} classes</span><span className={course.status === "Good standing" ? "status-good" : "status-warning"}>{course.status}</span></div><div className="course-bar"><span style={{ width: `${percentage}%` }} /></div></button>; }
-function RecentAttendance() { return <section className="recent card"><div className="section-heading"><div><p className="eyebrow">ACTIVITY LOG</p><h2>Recent Attendance</h2></div><button className="text-button" type="button">View all</button></div><div className="attendance-list">{attendanceRecords.map((record) => <div className="attendance-row" key={`${record.code}-${record.date}`}><div className="record-course"><strong>{record.code}</strong><span>{record.course}</span></div><div className="record-date"><strong>{record.date}</strong><span>{record.time}</span></div><span className="record-lecturer">{record.lecturer}</span><span className={`status-badge status-${record.status.toLowerCase()}`}><i />{record.status}</span></div>)}</div></section>; }
-function Notifications() { return <section className="notifications card"><div className="section-heading"><div><p className="eyebrow">STAY INFORMED</p><h2>Attendance Notifications</h2></div><span className="notification-count">{academicData.attendanceNotifications.length}</span></div>{attendanceNotifications.map((notification) => <div className="notification-row" key={notification.text}><span className={`notification-dot dot-${notification.kind}`} /><p>{notification.text}</p><time>{notification.time}</time></div>)}</section>; }
+function OverallCard({ percentage, present, total, warning }: { percentage: number | null; present: number; total: number; warning: string }) {
+  const display = percentage ?? 0;
+  return <section className="overall-card"><div className="card-kicker">SEMESTER OVERVIEW</div><h2>Overall Attendance</h2><div className="attendance-number"><strong>{display}</strong><span>%</span></div><div className="overall-bar"><span style={{ width: `${Math.min(100, Math.max(0, display))}%` }} /></div><div className="overall-foot"><span><b>{present}</b> Present</span><span><b>{total}</b> Total Classes</span></div><p>{warning}</p></section>;
+}
+function CourseCard({ course }: { course: DashboardApiCourse }) {
+  const percentage = course.attendancePercentage ?? 0;
+  const status = course.status === "Good standing" ? "status-good" : course.status === "At risk" ? "status-warning" : "status-neutral";
+
+  return <button type="button" className="course-card" onClick={() => window.alert(`${course.courseCode} attendance details are loaded from the database.`)}><div className="course-title"><div><strong>{course.courseCode}</strong><span>{course.courseTitle}</span></div><b>{percentage}%</b></div><div className="course-meta"><span>{course.present + course.late} / {course.eligibleSessions || course.totalSessions} classes</span><span className={status}>{course.status}</span></div><div className="course-bar"><span style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }} /></div></button>;
+}
+function RecentAttendance({ items }: { items: DashboardApiData["recentAttendance"] }) {
+  return <section className="recent card"><div className="section-heading"><div><p className="eyebrow">ACTIVITY LOG</p><h2>Recent Attendance</h2></div><button className="text-button" type="button">View all</button></div><div className="attendance-list">{items.map((record) => <div className="attendance-row" key={record.id}><div className="record-course"><strong>{record.courseCode}</strong><span>{record.courseTitle}</span></div><div className="record-date"><strong>{record.date}</strong><span>{record.time}</span></div><span className="record-lecturer">{record.status}</span><span className={`status-badge status-${record.status.toLowerCase()}`}><i />{record.status}</span></div>)}</div></section>;
+}
+function Notifications({ warnings }: { warnings: DashboardApiData["warnings"] }) {
+  const notices = warnings.length > 0 ? warnings.map((warning) => ({
+    kind: "warning",
+    text: `${warning.courseCode}: ${warning.attendancePercentage}% attendance is below ${warning.threshold}%`,
+    time: "Now",
+  })) : attendanceNotifications;
+
+  return <section className="notifications card"><div className="section-heading"><div><p className="eyebrow">STAY INFORMED</p><h2>Attendance Notifications</h2></div><span className="notification-count">{notices.length}</span></div>{notices.map((notification, index) => <div className="notification-row" key={`${notification.text}-${index}`}><span className={`notification-dot dot-${notification.kind}`} /><p>{notification.text}</p><time>{notification.time}</time></div>)}</section>;
+}
 
 function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const [semester, setSemester] = useState<Semester>("First Semester"); const [drawerOpen, setDrawerOpen] = useState(false);
-  return <div className="dashboard-shell"><Navigation onLogout={onLogout} /><header className="mobile-header"><button className="icon-button" onClick={() => setDrawerOpen(true)} aria-label="Open navigation"><Icon name="menu" /></button><Brand compact /><button className="icon-button" aria-label="View notifications"><Icon name="bell" /><i /></button></header>{drawerOpen && <><button className="drawer-scrim" onClick={() => setDrawerOpen(false)} aria-label="Close navigation" /><Navigation mobile onClose={() => setDrawerOpen(false)} onLogout={onLogout} /></>}<main className="dashboard-main"><header className="dashboard-header"><div><p className="eyebrow">THURSDAY, AUGUST 22, 2024</p><h1>Welcome, {student.firstName}</h1><p>{student.college}</p></div><div className="header-profile"><button className="header-notification" aria-label="View notifications" type="button"><Icon name="bell" /><i /></button><Avatar /><span>{student.name}</span><span className="chevron">⌄</span></div></header><div className="dashboard-grid"><div className="welcome-column"><div className="mobile-welcome"><p className="eyebrow">THURSDAY, AUGUST 22, 2024</p><h1>Welcome, {student.firstName}.</h1><p>Here is your attendance overview for this semester.</p></div><ProfileCard /><OverallCard /><section className="courses-section"><div className="section-heading"><div><p className="eyebrow">ACADEMIC RECORD</p><h2>My Courses</h2></div><div className="semester-switcher" role="tablist" aria-label="Select semester">{(["First Semester", "Second Semester"] as Semester[]).map((item) => <button key={item} type="button" role="tab" aria-selected={semester === item} className={semester === item ? "selected" : ""} onClick={() => setSemester(item)}>{item}</button>)}</div></div><div className="course-grid">{courses[semester].map((course) => <CourseCard key={course.id} course={course} />)}</div></section><RecentAttendance /><Notifications /></div><aside className="dashboard-aside"><ProfileCard /><Notifications /></aside></div></main></div>;
+  const [semester, setSemester] = useState<Semester>("First Semester");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [data, setData] = useState<DashboardApiData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadDashboard() {
+      try {
+        setLoading(true);
+        setError("");
+        const response = await fetch("/api/dashboard");
+        if (!response.ok) {
+          throw new Error("Unable to load dashboard.");
+        }
+
+        const payload = await response.json();
+        setData(payload.data ?? null);
+      } catch {
+        setError("Unable to load your attendance dashboard right now.");
+        setData(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDashboard();
+  }, []);
+
+  const courseList = data?.courses ?? [];
+  const overall = data?.overallAttendance;
+  const recent = data?.recentAttendance ?? [];
+  const warnings = data?.warnings ?? [];
+
+  return <div className="dashboard-shell"><Navigation onLogout={onLogout} /><header className="mobile-header"><button className="icon-button" onClick={() => setDrawerOpen(true)} aria-label="Open navigation"><Icon name="menu" /></button><Brand compact /><button className="icon-button" aria-label="View notifications"><Icon name="bell" /><i /></button></header>{drawerOpen && <><button className="drawer-scrim" onClick={() => setDrawerOpen(false)} aria-label="Close navigation" /><Navigation mobile onClose={() => setDrawerOpen(false)} onLogout={onLogout} /></>}<main className="dashboard-main"><header className="dashboard-header"><div><p className="eyebrow">STUDENT PORTAL</p><h1>Welcome, {data?.student?.name ?? student.firstName}</h1><p>{student.college}</p></div><div className="header-profile"><button className="header-notification" aria-label="View notifications" type="button"><Icon name="bell" /><i /></button><Avatar /><span>{data?.student?.name ?? student.name}</span><span className="chevron">⌄</span></div></header><div className="dashboard-grid"><div className="welcome-column"><div className="mobile-welcome"><p className="eyebrow">STUDENT PORTAL</p><h1>Welcome, {data?.student?.name ? data.student.name.split(" ")[0] : student.firstName}.</h1><p>Here is your attendance overview for this semester.</p></div><ProfileCard />{loading ? <div className="empty-state card"><span className="empty-icon">○</span><h3>Loading attendance...</h3><p>Please wait while we calculate your statistics.</p></div> : error ? <div className="empty-state card"><span className="empty-icon">○</span><h3>Unable to load dashboard</h3><p>{error}</p></div> : <><OverallCard percentage={overall?.attendancePercentage ?? null} present={overall?.attendedClasses ?? 0} total={overall?.totalClasses ?? 0} warning={overall && overall.attendancePercentage !== null && overall.attendancePercentage < overall.threshold ? "Below the 75% attendance requirement." : "Above the 75% attendance requirement."} /><section className="courses-section"><div className="section-heading"><div><p className="eyebrow">ACADEMIC RECORD</p><h2>My Courses</h2></div><div className="semester-switcher" role="tablist" aria-label="Select semester">{(["First Semester", "Second Semester"] as Semester[]).map((item) => <button key={item} type="button" role="tab" aria-selected={semester === item} className={semester === item ? "selected" : ""} onClick={() => setSemester(item)}>{item}</button>)}</div></div><div className="course-grid">{courseList.filter((course) => course.courseTitle.toLowerCase().includes(semester === "First Semester" ? "" : "")).map((course) => <CourseCard key={course.courseId} course={course} />)}</div></section><RecentAttendance items={recent} /><Notifications warnings={warnings} /></>}</div><aside className="dashboard-aside"><ProfileCard /><Notifications warnings={warnings} /></aside></div></main></div>;
 }
 
 const prototypeCourses = [...courses["First Semester"], ...courses["Second Semester"]];
 function AppFrame({ path, onLogout, unreadCount, children }: { path: string; onLogout: () => void; unreadCount: number; children: React.ReactNode }) { const [drawerOpen, setDrawerOpen] = useState(false); return <div className="dashboard-shell"><Navigation currentPath={path} unreadCount={unreadCount} onLogout={onLogout} /><header className="mobile-header"><button className="icon-button" onClick={() => setDrawerOpen(true)} aria-label="Open navigation"><Icon name="menu" /></button><Brand compact /><button className="icon-button" aria-label="View notifications" onClick={() => navigate("/notifications")}><Icon name="bell" /><i /></button></header>{drawerOpen && <><button className="drawer-scrim" onClick={() => setDrawerOpen(false)} aria-label="Close navigation" /><Navigation mobile currentPath={path} unreadCount={unreadCount} onClose={() => setDrawerOpen(false)} onLogout={onLogout} /></>}<main className="dashboard-main"><header className="dashboard-header"><div><p className="eyebrow">STUDENT PORTAL</p><h1>{path === "/courses" ? "My Courses" : path === "/notifications" ? "Notifications" : path === "/complaints" ? "Complaints & Support" : "Settings"}</h1><p>{student.college}</p></div><div className="header-profile"><button className="header-notification" aria-label="View notifications" type="button" onClick={() => navigate("/notifications")}><Icon name="bell" /><i /></button><Avatar /><span>{student.name}</span><span className="chevron">⌄</span></div></header>{children}</main></div>; }
 function PageIntro({ eyebrow, title, text }: { eyebrow: string; title: string; text: string }) { return <div className="page-intro"><p className="eyebrow">{eyebrow}</p><h2>{title}</h2><p>{text}</p></div>; }
-function CoursesPage() { const [query, setQuery] = useState(""); const [selected, setSelected] = useState<typeof prototypeCourses[number] | null>(null); const visible = prototypeCourses.filter((course) => `${course.code} ${course.title}`.toLowerCase().includes(query.toLowerCase())); return <div className="prototype-content"><PageIntro eyebrow="ACADEMIC RECORD" title="My Courses" text="Keep track of your current courses, learning progress, and resources in one place." />{selected ? <section className="detail-panel card"><button className="text-button" onClick={() => setSelected(null)} type="button">← Back to courses</button><p className="eyebrow">{selected.code}</p><h2>{selected.title}</h2><p>{selected.description}</p><div className="stats-grid"><div><span>Instructor</span><strong>{selected.lecturer}</strong></div><div><span>Learners</span><strong>{selected.learners} students</strong></div><div><span>Resources</span><strong>{selected.resources} materials</strong></div></div><div className="progress-label"><span>Course progress</span><strong>{courseAttendance(selected)}%</strong></div><div className="progress-track"><span style={{ width: `${courseAttendance(selected)}%` }} /></div><button className="primary-button" type="button" onClick={() => window.alert("Course materials are ready for review.")}>Open materials</button></section> : <><div className="toolbar card"><label htmlFor="course-search">Search courses</label><input id="course-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by code or course name" /></div><div className="prototype-course-grid">{visible.map((course) => <article className="prototype-course card" key={course.code}><div className="course-title"><div><strong>{course.code}</strong><h3>{course.title}</h3></div><span className="course-chip">{course.resources} resources</span></div><p>{course.description}</p><div className="course-detail"><span>Instructor<strong>{course.lecturer}</strong></span><span>Learners<strong>{course.learners} students</strong></span></div><div className="progress-label"><span>Progress</span><strong>{courseAttendance(course)}%</strong></div><div className="progress-track"><span style={{ width: `${courseAttendance(course)}%` }} /></div><small>{course.updated}</small><button className="primary-button" onClick={() => setSelected(course)} type="button">View Course</button></article>)}</div>{visible.length === 0 && <EmptyState title="No courses found" text="Try a different course code or name." />}</>}</div>; }
+function CoursesPage() {
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<CourseSummary | null>(null);
+  const [courseItems, setCourseItems] = useState<CourseSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadCourses() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await fetch("/api/courses");
+        if (!response.ok) {
+          throw new Error("Unable to load your courses.");
+        }
+
+        const payload = await response.json();
+        const items = Array.isArray(payload.data)
+          ? payload.data.map((course: Record<string, any>) => ({
+              id: String(course.id ?? ""),
+              code: String(course.code ?? course.courseCode ?? ""),
+              title: String(course.title ?? course.courseTitle ?? ""),
+              description: String(course.description ?? ""),
+              lecturer: String(course.lecturer ?? "Course Instructor"),
+              learners: Number(course.learners ?? 0),
+              resources: Number(course.resources ?? 0),
+              updated: String(course.updated ?? new Date().toISOString()),
+              present: Number(course.present ?? 0),
+              total: Number(course.total ?? 0),
+              status: course.status ?? "Good standing",
+              unit: Number(course.unit ?? 0),
+              semester: String(course.semester ?? ""),
+              academicSession: String(course.academicSession ?? ""),
+            }))
+          : [];
+
+        setCourseItems(items);
+      } catch {
+        setError("Unable to load your courses right now.");
+        setCourseItems([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadCourses();
+  }, []);
+
+  const visible = courseItems.filter((course) => `${course.code} ${course.title}`.toLowerCase().includes(query.toLowerCase()));
+
+  return <div className="prototype-content"><PageIntro eyebrow="ACADEMIC RECORD" title="My Courses" text="Keep track of your current courses, learning progress, and resources in one place." />{selected ? <section className="detail-panel card"><button className="text-button" onClick={() => setSelected(null)} type="button">← Back to courses</button><p className="eyebrow">{selected.code}</p><h2>{selected.title}</h2><p>{selected.description}</p><div className="stats-grid"><div><span>Unit</span><strong>{selected.unit ?? 0}</strong></div><div><span>Semester</span><strong>{selected.semester ?? "—"}</strong></div><div><span>Academic Session</span><strong>{selected.academicSession ?? "—"}</strong></div></div><div className="progress-label"><span>Course progress</span><strong>{Math.min(100, Math.max(0, selected.total ? Math.round((selected.present / selected.total) * 100) : 0))}%</strong></div><div className="progress-track"><span style={{ width: `${Math.min(100, Math.max(0, selected.total ? Math.round((selected.present / selected.total) * 100) : 0))}%` }} /></div><button className="primary-button" type="button" onClick={() => window.alert("Course materials are ready for review.")}>Open materials</button></section> : <><div className="toolbar card"><label htmlFor="course-search">Search courses</label><input id="course-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by code or course name" /></div>{loading ? <div className="empty-state card"><span className="empty-icon">○</span><h3>Loading courses...</h3><p>Please wait while we load your enrolled courses.</p></div> : error ? <div className="empty-state card"><span className="empty-icon">○</span><h3>Unable to load courses</h3><p>{error}</p></div> : visible.length === 0 ? <div className="empty-state card"><span className="empty-icon">○</span><h3>No courses found</h3><p>You are not currently enrolled in any courses.</p></div> : <div className="prototype-course-grid">{visible.map((course) => <article className="prototype-course card" key={course.id}><div className="course-title"><div><strong>{course.code}</strong><h3>{course.title}</h3></div><span className="course-chip">{course.unit ?? 0} units</span></div><p>{course.description}</p><div className="course-detail"><span>Semester<strong>{course.semester ?? "—"}</strong></span><span>Session<strong>{course.academicSession ?? "—"}</strong></span></div><div className="course-bar"><span style={{ width: `${Math.min(100, Math.max(0, course.total ? Math.round((course.present / course.total) * 100) : 0))}%` }} /></div><button className="text-button" type="button" onClick={() => setSelected(course)}>View details</button></article>)}</div>}</>}{selected && <div style={{ marginTop: 16 }} />}</div>;
+}
 type Notice = typeof academicData.notifications[number];
 function EmptyState({ title, text }: { title: string; text: string }) { return <div className="empty-state card"><span className="empty-icon">○</span><h3>{title}</h3><p>{text}</p></div>; }
 function NotificationsPage({ items, setItems }: { items: Notice[]; setItems: React.Dispatch<React.SetStateAction<Notice[]>> }) { const [filter, setFilter] = useState("All"); const filtered = items.filter((item) => filter === "All" || (filter === "Unread" && item.unread) || item.category === filter); return <div className="prototype-content"><PageIntro eyebrow="STAY INFORMED" title="Notifications" text="Stay updated with your latest activities and important announcements." /><div className="notification-toolbar"><div className="filter-tabs">{["All", "Unread", "Course", "System"].map((item) => <button className={filter === item ? "selected" : ""} key={item} onClick={() => setFilter(item)} type="button">{item}</button>)}</div><button className="text-button" onClick={() => setItems((current) => current.map((item) => ({ ...item, unread: false })))} type="button">Mark all as read</button></div><div className="full-notifications">{filtered.map((item) => <button className={`full-notification card ${item.unread ? "unread" : ""}`} key={item.id} onClick={() => setItems((current) => current.map((notice) => notice.id === item.id ? { ...notice, unread: false } : notice))} type="button"><span className="notice-icon"><Icon name={item.icon} /></span><span className="notice-copy"><strong>{item.title}</strong><span>{item.message}</span><small>{item.category} · {item.time}</small></span>{item.unread && <i className="unread-dot" />}</button>)}</div>{filtered.length === 0 && <EmptyState title="All caught up" text="There are no notifications in this view." />}</div>; }
@@ -47,7 +237,10 @@ function SettingsHeading({ title, text }: { title: string; text: string }) { ret
 function SaveButton({ saved, onSave }: { saved: boolean; onSave: () => void }) { return <button className="primary-button" type="button" onClick={onSave}>{saved ? "Changes saved" : "Save Changes"}</button>; }
 function Toggle({ label, text, checked: initial }: { label: string; text: string; checked: boolean }) { const [checked, setChecked] = useState(initial); return <div className="toggle-row"><span>{label}<small>{text}</small></span><button className={`switch ${checked ? "on" : ""}`} type="button" onClick={() => setChecked(!checked)} aria-label={`Toggle ${label}`}><i /></button></div>; }
 
-export default function Home() { const [path, setPath] = useState(""); const [noticeItems, setNoticeItems] = useState<Notice[]>([...academicData.notifications]); const [theme, setTheme] = useState<Theme>("light");
+export default function Home() {
+  const router = useRouter();
+  const { data: session, status } = useSession();
+  const [path, setPath] = useState(""); const [noticeItems, setNoticeItems] = useState<Notice[]>([...academicData.notifications]); const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
     const route = () => setPath(window.location.pathname);
@@ -67,4 +260,27 @@ export default function Home() { const [path, setPath] = useState(""); const [no
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
-  function goToDashboard() { navigate("/student/dashboard"); } function logout() { navigate("/"); } const unreadCount = noticeItems.filter((item) => item.unread).length; if (!path) return null; if (path === "/" || !["/student/dashboard", "/courses", "/notifications", "/complaints", "/settings", "/settings/email", "/settings/authentication", "/settings/preferences"].includes(path)) return <LoginPage onLogin={goToDashboard} />; if (path === "/student/dashboard") return <Dashboard onLogout={logout} />; return <AppFrame path={path} unreadCount={unreadCount} onLogout={logout}>{path === "/courses" ? <CoursesPage /> : path === "/notifications" ? <NotificationsPage items={noticeItems} setItems={setNoticeItems} /> : path === "/complaints" ? <ComplaintsPage /> : <SettingsPage path={path} theme={theme} onThemeChange={setTheme} />}</AppFrame>; }
+  useEffect(() => {
+    if (status === "authenticated" && path === "/") {
+      router.replace("/student/dashboard");
+    }
+  }, [path, router, status]);
+
+  function goToDashboard() {
+    router.push("/student/dashboard");
+  }
+
+  function logout() {
+    signOut({ callbackUrl: "/" });
+  }
+
+  const unreadCount = noticeItems.filter((item) => item.unread).length;
+
+  if (status === "loading") return null;
+  if (!path) return null;
+  if (!session && (path === "/" || !["/student/dashboard", "/courses", "/notifications", "/complaints", "/settings", "/settings/email", "/settings/authentication", "/settings/preferences"].includes(path))) return <LoginPage onLogin={goToDashboard} />;
+  if (!session && path !== "/") return <LoginPage onLogin={goToDashboard} />;
+  if (path === "/") return <LoginPage onLogin={goToDashboard} />;
+  if (path === "/student/dashboard") return <Dashboard onLogout={logout} />;
+  return <AppFrame path={path} unreadCount={unreadCount} onLogout={logout}>{path === "/courses" ? <CoursesPage /> : path === "/notifications" ? <NotificationsPage items={noticeItems} setItems={setNoticeItems} /> : path === "/complaints" ? <ComplaintsPage /> : <SettingsPage path={path} theme={theme} onThemeChange={setTheme} />}</AppFrame>;
+}

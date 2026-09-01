@@ -1,22 +1,70 @@
 import { PrismaClient, UserRole, AttendanceStatus, NotificationType, ComplaintCategory, ComplaintPriority, ComplaintStatus } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password.trim(), 12);
+}
+
 async function main() {
+  const studentPassword = process.env.DEMO_STUDENT_PASSWORD ?? "Student123!";
+  const lecturerPassword = process.env.DEMO_LECTURER_PASSWORD ?? "Lecturer123!";
+  const adminPassword = process.env.DEMO_ADMIN_PASSWORD ?? "Admin123!";
+
   const student = await prisma.user.upsert({
     where: { email: "joshua.ojo@abuad.edu.ng" },
     update: {
       fullName: "Joshua Ojo",
       matricNumber: "ABUAD/20/4521",
       role: UserRole.STUDENT,
+      passwordHash: await hashPassword(studentPassword),
     },
     create: {
       fullName: "Joshua Ojo",
       email: "joshua.ojo@abuad.edu.ng",
       matricNumber: "ABUAD/20/4521",
       role: UserRole.STUDENT,
+      passwordHash: await hashPassword(studentPassword),
     },
   });
+
+  const lecturer = await prisma.user.upsert({
+    where: { email: "dr.williams@abuad.edu.ng" },
+    update: {
+      fullName: "Dr. O. Williams",
+      matricNumber: null,
+      role: UserRole.LECTURER,
+      passwordHash: await hashPassword(lecturerPassword),
+    },
+    create: {
+      fullName: "Dr. O. Williams",
+      email: "dr.williams@abuad.edu.ng",
+      matricNumber: null,
+      role: UserRole.LECTURER,
+      passwordHash: await hashPassword(lecturerPassword),
+    },
+  });
+
+  const admin = await prisma.user.upsert({
+    where: { email: "admin@abuad.edu.ng" },
+    update: {
+      fullName: "System Administrator",
+      matricNumber: null,
+      role: UserRole.ADMIN,
+      passwordHash: await hashPassword(adminPassword),
+    },
+    create: {
+      fullName: "System Administrator",
+      email: "admin@abuad.edu.ng",
+      matricNumber: null,
+      role: UserRole.ADMIN,
+      passwordHash: await hashPassword(adminPassword),
+    },
+  });
+
+  void lecturer;
+  void admin;
 
   await prisma.studentProfile.upsert({
     where: { userId: student.id },

@@ -53,6 +53,7 @@ model User {
   id            String    @id @default(cuid())
   fullName      String
   email         String    @unique
+  passwordHash  String?
   matricNumber  String?   @unique
   role          UserRole  @default(STUDENT)
   createdAt     DateTime  @default(now())
