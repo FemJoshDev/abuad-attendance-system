@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { academicData, attendanceNotifications, courses, student } from "@/mock/academicData";
 import type { Course, Semester } from "@/mock/academicData";
 import type { CourseSummary } from "@/src/types/course";
+import ComplaintPanel from "@/app/complaints/ComplaintPanel";
 
 type DashboardApiCourse = {
   courseId: string;
@@ -62,6 +63,7 @@ type DashboardApiData = {
 
 type IconName = "grid" | "book" | "bell" | "alert" | "settings" | "logout" | "menu" | "close" | "eye" | "eye-off";
 type ApiNotification = { id: string; title: string; message: string; type: "ATTENDANCE" | "COURSE" | "SYSTEM" | "WARNING"; isRead: boolean; createdAt: string };
+type ApiComplaint = { id: string; subject: string; category: string; priority: string; description: string; status: string; createdAt: string; updatedAt: string };
 const icons: Record<IconName, string> = { grid: "▦", book: "▤", bell: "♧", alert: "△", settings: "⚙", logout: "↪", menu: "☰", close: "×", eye: "◉", "eye-off": "⊘" };
 function Icon({ name }: { name: IconName }) { return <span className={`icon icon-${name}`} aria-hidden="true">{icons[name]}</span>; }
 function Brand({ compact = false }: { compact?: boolean }) { return <div className={`brand ${compact ? "brand-compact" : ""}`}><div className="crest">A</div><div><strong>ABUAD</strong><span>{compact ? "Attendance" : "Attendance Management System"}</span></div></div>; }
@@ -297,5 +299,5 @@ export default function Home() {
   if (!session && path !== "/") return <LoginPage onLogin={goToDashboard} />;
   if (path === "/") return <LoginPage onLogin={goToDashboard} />;
   if (path === "/student/dashboard") return <Dashboard onLogout={logout} unreadCount={unreadCount} />;
-  return <AppFrame path={path} unreadCount={unreadCount} onLogout={logout}>{path === "/courses" ? <CoursesPage /> : path === "/notifications" ? <NotificationsPage items={noticeItems} setItems={setNoticeItems} setUnreadCount={setUnreadCount} /> : path === "/complaints" ? <ComplaintsPage /> : <SettingsPage path={path} theme={theme} onThemeChange={setTheme} />}</AppFrame>;
+  return <AppFrame path={path} unreadCount={unreadCount} onLogout={logout}>{path === "/courses" ? <CoursesPage /> : path === "/notifications" ? <NotificationsPage items={noticeItems} setItems={setNoticeItems} setUnreadCount={setUnreadCount} /> : path === "/complaints" ? <ComplaintPanel /> : <SettingsPage path={path} theme={theme} onThemeChange={setTheme} />}</AppFrame>;
 }

@@ -181,6 +181,7 @@ model Complaint {
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, status])
+  @@index([createdAt])
   @@index([priority])
 }
 
