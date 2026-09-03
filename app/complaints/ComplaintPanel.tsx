@@ -42,7 +42,8 @@ export default function ComplaintPanel() {
   }
 
   useEffect(() => {
-    loadComplaints();
+    const load = window.setTimeout(loadComplaints, 0);
+    return () => window.clearTimeout(load);
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {

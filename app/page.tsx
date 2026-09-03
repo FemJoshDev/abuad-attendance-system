@@ -7,6 +7,7 @@ import { academicData, attendanceNotifications, courses, student } from "@/mock/
 import type { Course, Semester } from "@/mock/academicData";
 import type { CourseSummary } from "@/src/types/course";
 import ComplaintPanel from "@/app/complaints/ComplaintPanel";
+import SettingsPanel from "@/app/settings/SettingsPanel";
 
 type DashboardApiCourse = {
   courseId: string;
@@ -63,7 +64,6 @@ type DashboardApiData = {
 
 type IconName = "grid" | "book" | "bell" | "alert" | "settings" | "logout" | "menu" | "close" | "eye" | "eye-off";
 type ApiNotification = { id: string; title: string; message: string; type: "ATTENDANCE" | "COURSE" | "SYSTEM" | "WARNING"; isRead: boolean; createdAt: string };
-type ApiComplaint = { id: string; subject: string; category: string; priority: string; description: string; status: string; createdAt: string; updatedAt: string };
 const icons: Record<IconName, string> = { grid: "▦", book: "▤", bell: "♧", alert: "△", settings: "⚙", logout: "↪", menu: "☰", close: "×", eye: "◉", "eye-off": "⊘" };
 function Icon({ name }: { name: IconName }) { return <span className={`icon icon-${name}`} aria-hidden="true">{icons[name]}</span>; }
 function Brand({ compact = false }: { compact?: boolean }) { return <div className={`brand ${compact ? "brand-compact" : ""}`}><div className="crest">A</div><div><strong>ABUAD</strong><span>{compact ? "Attendance" : "Attendance Management System"}</span></div></div>; }
@@ -132,7 +132,7 @@ function Notifications({ warnings }: { warnings: DashboardApiData["warnings"] })
   return <section className="notifications card"><div className="section-heading"><div><p className="eyebrow">STAY INFORMED</p><h2>Attendance Notifications</h2></div><span className="notification-count">{notices.length}</span></div>{notices.map((notification, index) => <div className="notification-row" key={`${notification.text}-${index}`}><span className={`notification-dot dot-${notification.kind}`} /><p>{notification.text}</p><time>{notification.time}</time></div>)}</section>;
 }
 
-function Dashboard({ onLogout, unreadCount }: { onLogout: () => void; unreadCount: number }) {
+function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [semester, setSemester] = useState<Semester>("First Semester");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [data, setData] = useState<DashboardApiData | null>(null);
@@ -298,6 +298,6 @@ export default function Home() {
   if (!session && (path === "/" || !["/student/dashboard", "/courses", "/notifications", "/complaints", "/settings", "/settings/email", "/settings/authentication", "/settings/preferences"].includes(path))) return <LoginPage onLogin={goToDashboard} />;
   if (!session && path !== "/") return <LoginPage onLogin={goToDashboard} />;
   if (path === "/") return <LoginPage onLogin={goToDashboard} />;
-  if (path === "/student/dashboard") return <Dashboard onLogout={logout} unreadCount={unreadCount} />;
-  return <AppFrame path={path} unreadCount={unreadCount} onLogout={logout}>{path === "/courses" ? <CoursesPage /> : path === "/notifications" ? <NotificationsPage items={noticeItems} setItems={setNoticeItems} setUnreadCount={setUnreadCount} /> : path === "/complaints" ? <ComplaintPanel /> : <SettingsPage path={path} theme={theme} onThemeChange={setTheme} />}</AppFrame>;
+  if (path === "/student/dashboard") return <Dashboard onLogout={logout} />;
+  return <AppFrame path={path} unreadCount={unreadCount} onLogout={logout}>{path === "/courses" ? <CoursesPage /> : path === "/notifications" ? <NotificationsPage items={noticeItems} setItems={setNoticeItems} setUnreadCount={setUnreadCount} /> : path === "/complaints" ? <ComplaintPanel /> : <SettingsPanel path={path} theme={theme} onThemeChange={setTheme} />}</AppFrame>;
 }
