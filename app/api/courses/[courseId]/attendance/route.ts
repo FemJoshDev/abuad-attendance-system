@@ -3,7 +3,8 @@ import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/src/lib/prisma";
-import { getStudentCourseAttendanceSummary } from "@/src/services/attendance.service";
+import { AttendanceStatus } from "@prisma/client";
+import { getStudentCourseAttendanceSummary, recordStudentAttendance } from "@/src/services/attendance.service";
 
 export async function GET(_: Request, { params }: { params: Promise<{ courseId: string }> }) {
   const session = await getServerSession(authOptions);
@@ -44,4 +45,41 @@ export async function GET(_: Request, { params }: { params: Promise<{ courseId: 
   }
 
   return NextResponse.json({ success: true, data: summary }, { status: 200 });
+}
+
+export async function POST(request: Request, { params }: { params: Promise<{ courseId: string }> }) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
+  if (!user || (user.role !== "LECTURER" && user.role !== "ADMIN")) {
+    return NextResponse.json({ success: false, error: "Access denied." }, { status: 403 });
+  }
+
+  const { courseId } = await params;
+  let body: { sessionId?: string; studentId?: string; status?: AttendanceStatus };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ success: false, error: "Invalid request body." }, { status: 400 });
+  }
+
+  if (!courseId || !body.sessionId || !body.studentId || !body.status || !Object.values(AttendanceStatus).includes(body.status)) {
+    return NextResponse.json({ success: false, error: "Invalid attendance data." }, { status: 400 });
+  }
+
+  const attendanceSession = await prisma.attendanceSession.findFirst({ where: { id: body.sessionId, courseId } });
+  if (!attendanceSession) {
+    return NextResponse.json({ success: false, error: "Attendance session not found." }, { status: 404 });
+  }
+
+  try {
+    const data = await recordStudentAttendance({ sessionId: body.sessionId, studentId: body.studentId, status: body.status });
+    return NextResponse.json({ success: true, data }, { status: 200 });
+  } catch {
+    return NextResponse.json({ success: false, error: "Unable to record attendance." }, { status: 500 });
+  }
 }

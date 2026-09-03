@@ -14,6 +14,7 @@ export async function GET() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
+    select: { id: true, role: true },
   });
 
   if (!user || user.role !== "STUDENT") {
@@ -23,8 +24,7 @@ export async function GET() {
   try {
     const data = await getStudentDashboardData(user.id);
     return NextResponse.json({ success: true, data }, { status: 200 });
-  } catch (error) {
-    console.error("Dashboard fetch failed", error);
+  } catch {
     return NextResponse.json({ success: false, error: "Unable to load dashboard data." }, { status: 500 });
   }
 }

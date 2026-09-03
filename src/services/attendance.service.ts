@@ -1,6 +1,7 @@
 import { AttendanceStatus, type UserRole } from "@prisma/client";
 
 import { prisma } from "@/src/lib/prisma";
+import { createLowAttendanceNotification } from "@/src/services/notification.service";
 
 export type AttendanceStatusKey = keyof typeof AttendanceStatus;
 
@@ -62,6 +63,8 @@ export type StudentDashboardData = {
 };
 
 const ATTENDANCE_THRESHOLD = 75;
+
+export const attendanceThreshold = ATTENDANCE_THRESHOLD;
 
 export function toPercentage(attended: number, eligibleSessions: number): number | null {
   if (eligibleSessions <= 0) {
@@ -169,6 +172,53 @@ export async function getStudentCourseAttendanceSummary(
   };
 }
 
+export async function recordStudentAttendance(input: {
+  sessionId: string;
+  studentId: string;
+  status: AttendanceStatus;
+}) {
+  const session = await prisma.attendanceSession.findUnique({
+    where: { id: input.sessionId },
+    include: { course: true },
+  });
+
+  if (!session) {
+    throw new Error("Attendance session not found.");
+  }
+
+  const enrollment = await prisma.enrollment.findFirst({
+    where: { studentId: input.studentId, courseId: session.courseId },
+  });
+
+  if (!enrollment) {
+    throw new Error("Student is not enrolled in this course.");
+  }
+
+  const before = await getStudentCourseAttendanceSummary(input.studentId, session.courseId, "STUDENT");
+  await prisma.attendanceRecord.upsert({
+    where: { sessionId_studentId: { sessionId: input.sessionId, studentId: input.studentId } },
+    update: { status: input.status },
+    create: { sessionId: input.sessionId, studentId: input.studentId, status: input.status },
+  });
+  const after = await getStudentCourseAttendanceSummary(input.studentId, session.courseId, "STUDENT");
+
+  if (
+    after?.attendancePercentage !== null &&
+    after?.attendancePercentage !== undefined &&
+    after.attendancePercentage < ATTENDANCE_THRESHOLD &&
+    (before?.attendancePercentage === null || before?.attendancePercentage === undefined || before.attendancePercentage >= ATTENDANCE_THRESHOLD)
+  ) {
+    await createLowAttendanceNotification({
+      userId: input.studentId,
+      courseCode: session.course.courseCode,
+      attendancePercentage: after.attendancePercentage,
+      threshold: ATTENDANCE_THRESHOLD,
+    });
+  }
+
+  return after;
+}
+
 export async function getStudentOverallAttendanceSummary(userId: string): Promise<OverallAttendanceSummary> {
   const sessions = await prisma.attendanceSession.findMany({
     where: {
@@ -222,12 +272,59 @@ export async function getStudentDashboardData(userId: string): Promise<StudentDa
     orderBy: { createdAt: "asc" },
   });
 
-  const courses = await Promise.all(
-    enrollments.map((enrollment) => getStudentCourseAttendanceSummary(userId, enrollment.courseId, "STUDENT")),
-  );
+  const sessions = await prisma.attendanceSession.findMany({
+    where: { courseId: { in: enrollments.map((enrollment) => enrollment.courseId) } },
+    include: {
+      records: {
+        where: { studentId: userId },
+        select: { status: true },
+      },
+    },
+    orderBy: { date: "asc" },
+  });
+
+  const sessionsByCourse = new Map<string, typeof sessions>();
+  for (const session of sessions) {
+    const courseSessions = sessionsByCourse.get(session.courseId) ?? [];
+    courseSessions.push(session);
+    sessionsByCourse.set(session.courseId, courseSessions);
+  }
+
+  const courses = enrollments.map((enrollment) => {
+    const baseSummary = aggregateSessionStatuses(sessionsByCourse.get(enrollment.courseId) ?? []);
+    const attendancePercentage = baseSummary.attendancePercentage;
+
+    return {
+      courseId: enrollment.course.id,
+      courseCode: enrollment.course.courseCode,
+      courseTitle: enrollment.course.courseTitle,
+      threshold: ATTENDANCE_THRESHOLD,
+      lowAttendance: attendancePercentage !== null && attendancePercentage < ATTENDANCE_THRESHOLD,
+      status: attendancePercentage === null ? "No data" : attendancePercentage >= ATTENDANCE_THRESHOLD ? "Good standing" : "At risk",
+      ...baseSummary,
+    } satisfies CourseAttendanceSummary;
+  });
 
   const validCourses = courses.filter((course): course is CourseAttendanceSummary => Boolean(course));
-  const overallAttendance = await getStudentOverallAttendanceSummary(userId);
+  const overallBase = validCourses.reduce(
+    (summary, course) => ({
+      present: summary.present + course.present,
+      absent: summary.absent + course.absent,
+      late: summary.late + course.late,
+      excused: summary.excused + course.excused,
+      totalClasses: summary.totalClasses + course.totalSessions,
+      attendedClasses: summary.attendedClasses + course.attended,
+    }),
+    { present: 0, absent: 0, late: 0, excused: 0, totalClasses: 0, attendedClasses: 0 },
+  );
+  const overallAttendance: OverallAttendanceSummary = {
+    ...overallBase,
+    attendancePercentage: toPercentage(
+      overallBase.attendedClasses,
+      Math.max(0, overallBase.totalClasses - overallBase.excused),
+    ),
+    threshold: ATTENDANCE_THRESHOLD,
+  };
 
   const recentAttendance = await prisma.attendanceRecord.findMany({
     where: { studentId: userId },
