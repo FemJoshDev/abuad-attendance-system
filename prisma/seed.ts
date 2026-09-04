@@ -8,9 +8,14 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 async function main() {
-  const studentPassword = process.env.DEMO_STUDENT_PASSWORD ?? "Student123!";
-  const lecturerPassword = process.env.DEMO_LECTURER_PASSWORD ?? "Lecturer123!";
-  const adminPassword = process.env.DEMO_ADMIN_PASSWORD ?? "Admin123!";
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Demo seed data is disabled in production.");
+  }
+
+  const studentPassword = process.env.DEMO_STUDENT_PASSWORD ?? (process.env.NODE_ENV === "development" ? "Student123!" : "");
+  const lecturerPassword = process.env.DEMO_LECTURER_PASSWORD ?? (process.env.NODE_ENV === "development" ? "Lecturer123!" : "");
+  const adminPassword = process.env.DEMO_ADMIN_PASSWORD ?? (process.env.NODE_ENV === "development" ? "Admin123!" : "");
+  if (!studentPassword || !lecturerPassword || !adminPassword) throw new Error("Demo seed passwords must be provided outside development.");
 
   const student = await prisma.user.upsert({
     where: { email: "joshua.ojo@abuad.edu.ng" },

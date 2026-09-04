@@ -425,11 +425,11 @@ To set up the database locally:
 
 1. Ensure PostgreSQL is running on localhost:5432
 2. Create a database named abuad_attendance
-3. Set DATABASE_URL in the project environment
-4. Run Prisma schema sync:
+3. Set DATABASE_URL, NEXTAUTH_SECRET, and NEXTAUTH_URL in the project environment
+4. Apply tracked migrations:
 
 ```bash
-npx prisma db push
+npx prisma migrate deploy
 ```
 
 5. Seed demo records:
@@ -453,6 +453,47 @@ npm run db:deploy
 npm run db:seed
 npm run db:studio
 ```
+
+## Production Deployment
+
+The application is a Next.js Node deployment backed by PostgreSQL. The hosting provider is intentionally not hardcoded; use a provider that supports Node.js 20+, persistent environment variables, HTTPS, and a managed PostgreSQL database.
+
+Required production environment variables:
+
+```env
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public
+NEXTAUTH_SECRET=<strong-random-secret>
+NEXTAUTH_URL=https://your-production-domain.example
+```
+
+Deployment sequence:
+
+```bash
+npm ci
+npm run db:generate
+npx prisma migrate deploy
+npm run build
+npm run start
+```
+
+Do not run `prisma db push` or `npm run db:seed` against production. The seed command is blocked when `NODE_ENV=production` and is intended only for local demo data. Configure `NEXTAUTH_URL` to the canonical HTTPS domain; do not use localhost in production.
+
+Profile photos currently use local development storage under `public/uploads/avatars`. Production deployments must configure durable object storage and adapt the avatar route before enabling profile-photo uploads. Do not rely on ephemeral filesystem storage.
+
+The application sets `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and `Permissions-Policy` headers. HTTPS termination and HSTS should be enabled at the hosting platform or reverse proxy once the production domain is permanently HTTPS-only.
+
+### Backup and Recovery
+
+Configure and verify managed PostgreSQL automated backups and point-in-time recovery with the hosting provider. No backup service is configured by this repository. Before applying a migration, take a database backup and record the migration version. Rollback should use a tested forward migration or restore a verified backup; do not edit applied migration files.
+
+Keep object-storage versioning or backups enabled when production avatar storage is introduced. The current local avatar files are not a production recovery mechanism.
+
+### Troubleshooting
+
+- `NEXTAUTH_SECRET and a public HTTPS NEXTAUTH_URL are required in production`: set strong, non-default production values.
+- Prisma connection errors: verify `DATABASE_URL`, network access, and that `npx prisma migrate deploy` completed.
+- Avatar upload returns `503`: durable production storage has not been configured yet.
+- Authentication callback problems: confirm `NEXTAUTH_URL` exactly matches the public origin and that HTTPS is active.
 
 ## Development Setup
 

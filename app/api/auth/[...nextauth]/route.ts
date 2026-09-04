@@ -7,6 +7,12 @@ import type { UserRole } from "@prisma/client";
 import { prisma } from "@/src/lib/prisma";
 import { verifyPassword } from "@/src/lib/password";
 
+function assertProductionAuthConfig() {
+  if (process.env.NODE_ENV === "production" && (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET === "dev-secret-change-me-in-production" || !process.env.NEXTAUTH_URL?.startsWith("https://"))) {
+    throw new Error("NEXTAUTH_SECRET and a public HTTPS NEXTAUTH_URL are required in production.");
+  }
+}
+
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt" as const,
@@ -23,6 +29,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        assertProductionAuthConfig();
         const identifier = credentials?.email?.trim() ?? "";
         const password = credentials?.password ?? "";
 
