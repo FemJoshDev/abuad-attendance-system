@@ -22,6 +22,15 @@ export default function SettingsPanel({ path, theme, onThemeChange }: { path: st
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [photoError, setPhotoError] = useState("");
+
+  async function uploadPhoto(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.match(/^image\/(jpeg|png|webp)$/) || file.size > 5 * 1024 * 1024) { setPhotoError("Choose a JPG, PNG, or WebP image smaller than 5 MB."); return; }
+    const body = new FormData(); body.append("file", file);
+    try { const response = await fetch("/api/settings/profile/avatar", { method: "POST", body }); if (!response.ok) throw new Error(); setPhotoError(""); window.dispatchEvent(new Event("avatar-updated")); } catch { setPhotoError("Unable to save your profile photo right now."); }
+  }
 
   useEffect(() => {
     async function load() {

@@ -5,8 +5,10 @@ const protectedPrefixes = [
   "/student/dashboard",
   "/courses",
   "/notifications",
+  "/student/notifications",
   "/complaints",
   "/settings",
+  "/lecturer",
 ];
 
 export default withAuth(
@@ -44,7 +46,9 @@ export const config = {
     "/student/dashboard/:path*",
     "/courses/:path*",
     "/notifications/:path*",
+    "/student/notifications/:path*",
     "/complaints/:path*",
     "/settings/:path*",
+    "/lecturer/:path*",
   ],
 };

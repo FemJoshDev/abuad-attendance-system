@@ -48,6 +48,7 @@ export type StudentDashboardData = {
     name: string;
     email: string;
     matricNumber: string | null;
+    avatarUrl: string | null;
   };
   overallAttendance: OverallAttendanceSummary;
   courses: CourseAttendanceSummary[];
@@ -259,6 +260,7 @@ export async function getStudentDashboardData(userId: string): Promise<StudentDa
       fullName: true,
       email: true,
       matricNumber: true,
+      avatarUrl: true,
     },
   });
 
@@ -356,6 +358,7 @@ export async function getStudentDashboardData(userId: string): Promise<StudentDa
       name: student.fullName,
       email: student.email,
       matricNumber: student.matricNumber,
+      avatarUrl: student.avatarUrl,
     },
     overallAttendance,
     courses: validCourses,

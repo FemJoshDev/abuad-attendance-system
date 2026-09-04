@@ -55,6 +55,7 @@ model User {
   email         String    @unique
   passwordHash  String?
   matricNumber  String?   @unique
+  avatarUrl     String?
   role          UserRole  @default(STUDENT)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -65,6 +66,8 @@ model User {
   notifications  Notification[]
   complaints     Complaint[]
   preferences    UserPreferences?
+  lecturerAssignments LecturerCourseAssignment[]
+  createdAttendanceSessions AttendanceSession[] @relation("SessionCreator")
 
   @@index([email])
   @@index([role])
@@ -100,10 +103,28 @@ model Course {
 
   enrollments     Enrollment[]
   attendanceSessions AttendanceSession[]
+  lecturerAssignments LecturerCourseAssignment[]
 
   @@index([courseCode])
   @@index([semester])
   @@index([academicSession])
+}
+
+model LecturerCourseAssignment {
+  id              String   @id @default(cuid())
+  lecturerId      String
+  courseId        String
+  academicSession String?
+  semester        String?
+  active          Boolean  @default(true)
+  assignedAt      DateTime @default(now())
+
+  lecturer User   @relation(fields: [lecturerId], references: [id], onDelete: Cascade)
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([lecturerId, courseId, academicSession, semester])
+  @@index([lecturerId, active])
+  @@index([courseId])
 }
 
 model Enrollment {
@@ -127,9 +148,13 @@ model AttendanceSession {
   courseId  String
   date      DateTime @db.Date
   startTime DateTime?
+  endTime   DateTime?
+  isOpen    Boolean  @default(true)
+  createdById String?
   createdAt DateTime @default(now())
 
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("SessionCreator", fields: [createdById], references: [id], onDelete: SetNull)
   records   AttendanceRecord[]
 
   @@index([courseId, date])

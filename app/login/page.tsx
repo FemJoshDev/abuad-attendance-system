@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn, useSession } from "next-auth/react";
+import { getSession, signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -23,7 +23,7 @@ function Icon({ name }: { name: "eye" | "eye-off" }) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -32,9 +32,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/student/dashboard");
+      router.replace(session?.user?.role === "LECTURER" || session?.user?.role === "ADMIN" ? "/lecturer" : "/student/dashboard");
     }
-  }, [router, status]);
+  }, [router, session?.user?.role, status]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,7 +56,8 @@ export default function LoginPage() {
     if (result?.error) {
       setError("Invalid email or password.");
     } else {
-      router.push("/student/dashboard");
+      const authenticatedSession = await getSession();
+      router.push(authenticatedSession?.user?.role === "LECTURER" || authenticatedSession?.user?.role === "ADMIN" ? "/lecturer" : "/student/dashboard");
     }
 
     setLoading(false);

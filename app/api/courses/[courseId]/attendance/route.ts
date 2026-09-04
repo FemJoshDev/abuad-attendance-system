@@ -5,6 +5,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/src/lib/prisma";
 import { AttendanceStatus } from "@prisma/client";
 import { getStudentCourseAttendanceSummary, recordStudentAttendance } from "@/src/services/attendance.service";
+import { canManageCourse } from "@/src/services/lecturer.service";
 
 export async function GET(_: Request, { params }: { params: Promise<{ courseId: string }> }) {
   const session = await getServerSession(authOptions);
@@ -60,6 +61,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ cou
   }
 
   const { courseId } = await params;
+  if (!(await canManageCourse(session.user.id, user.role, courseId))) {
+    return NextResponse.json({ success: false, error: "Course access denied." }, { status: 403 });
+  }
   let body: { sessionId?: string; studentId?: string; status?: AttendanceStatus };
   try {
     body = await request.json();

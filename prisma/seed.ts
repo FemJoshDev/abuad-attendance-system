@@ -159,6 +159,24 @@ async function main() {
   }
 
   for (const course of createdCourses) {
+    await prisma.lecturerCourseAssignment.upsert({
+      where: {
+        lecturerId_courseId_academicSession_semester: {
+          lecturerId: lecturer.id,
+          courseId: course.id,
+          academicSession: course.academicSession,
+          semester: course.semester,
+        },
+      },
+      update: { active: true },
+      create: {
+        lecturerId: lecturer.id,
+        courseId: course.id,
+        academicSession: course.academicSession,
+        semester: course.semester,
+      },
+    });
+
     await prisma.enrollment.upsert({
       where: {
         studentId_courseId_academicSession_semester: {

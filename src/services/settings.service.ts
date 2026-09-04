@@ -14,7 +14,7 @@ const preferenceFields = {
 export function getUserProfile(userId: string) {
   return prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, fullName: true, email: true, matricNumber: true, role: true },
+    select: { id: true, fullName: true, email: true, matricNumber: true, avatarUrl: true, role: true },
   });
 }
 
@@ -22,7 +22,7 @@ export function updateUserProfile(userId: string, fullName: string) {
   return prisma.user.update({
     where: { id: userId },
     data: { fullName },
-    select: { id: true, fullName: true, email: true, matricNumber: true, role: true },
+    select: { id: true, fullName: true, email: true, matricNumber: true, avatarUrl: true, role: true },
   });
 }
 

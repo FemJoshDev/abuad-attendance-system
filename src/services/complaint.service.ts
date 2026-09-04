@@ -51,5 +51,18 @@ export function getUserComplaint(userId: string, complaintId: string) {
 }
 
 export function updateComplaintStatus(complaintId: string, status: ComplaintStatus) {
-  return prisma.complaint.update({ where: { id: complaintId }, data: { status }, select: { id: true, status: true, updatedAt: true } });
+  return prisma.complaint.findUnique({ where: { id: complaintId }, select: { status: true } }).then((complaint) => {
+    if (!complaint) throw new Error("Complaint not found.");
+
+    const allowedTransitions: Record<ComplaintStatus, ComplaintStatus[]> = {
+      PENDING: [ComplaintStatus.IN_REVIEW, ComplaintStatus.RESOLVED, ComplaintStatus.CLOSED],
+      IN_REVIEW: [ComplaintStatus.RESOLVED, ComplaintStatus.CLOSED],
+      RESOLVED: [],
+      CLOSED: [],
+    };
+
+    if (!allowedTransitions[complaint.status].includes(status)) throw new Error("Invalid complaint status transition.");
+
+    return prisma.complaint.update({ where: { id: complaintId }, data: { status }, select: { id: true, status: true, updatedAt: true } });
+  });
 }
