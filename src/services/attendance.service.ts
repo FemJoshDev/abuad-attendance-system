@@ -67,6 +67,16 @@ const ATTENDANCE_THRESHOLD = 75;
 
 export const attendanceThreshold = ATTENDANCE_THRESHOLD;
 
+export type AttendanceCounts = Pick<CourseAttendanceSummary, "present" | "absent" | "late" | "excused">;
+
+export function calculateAttendance(counts: AttendanceCounts) {
+  const attended = counts.present + counts.late;
+  const totalSessions = attended + counts.absent + counts.excused;
+  const eligibleSessions = Math.max(0, totalSessions - counts.excused);
+  const attendancePercentage = toPercentage(attended, eligibleSessions);
+  return { ...counts, totalSessions, attended, eligibleSessions, attendancePercentage, threshold: ATTENDANCE_THRESHOLD, lowAttendance: attendancePercentage !== null && attendancePercentage < ATTENDANCE_THRESHOLD };
+}
+
 export function toPercentage(attended: number, eligibleSessions: number): number | null {
   if (eligibleSessions <= 0) {
     return null;
@@ -185,6 +195,10 @@ export async function recordStudentAttendance(input: {
 
   if (!session) {
     throw new Error("Attendance session not found.");
+  }
+
+  if (!session.isOpen) {
+    throw new Error("Attendance session is closed.");
   }
 
   const enrollment = await prisma.enrollment.findFirst({

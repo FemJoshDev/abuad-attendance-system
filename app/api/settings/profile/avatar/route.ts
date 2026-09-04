@@ -36,6 +36,10 @@ export async function POST(request: Request) {
   await fs.writeFile(path.join(uploadDirectory, fileName), Buffer.from(await file.arrayBuffer()));
 
   const avatarUrl = `/uploads/avatars/${fileName}`;
+  const previous = await prisma.user.findUnique({ where: { id: session.user.id }, select: { avatarUrl: true } });
   const data = await prisma.user.update({ where: { id: session.user.id }, data: { avatarUrl }, select: { avatarUrl: true } });
+  if (previous?.avatarUrl?.startsWith("/uploads/avatars/")) {
+    await fs.unlink(path.join(process.cwd(), "public", previous.avatarUrl)).catch(() => undefined);
+  }
   return NextResponse.json({ success: true, data }, { status: 200 });
 }

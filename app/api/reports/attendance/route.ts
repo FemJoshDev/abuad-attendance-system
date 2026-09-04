@@ -21,6 +21,7 @@ export async function GET(request: Request) {
   const from = parseDate(params.get("from"));
   const to = parseDate(params.get("to"));
   if (from === null || to === null || (from && to && from > to)) return NextResponse.json({ success: false, error: "Invalid date range." }, { status: 400 });
+  if (from && to && to.getTime() - from.getTime() > 366 * 24 * 60 * 60 * 1000) return NextResponse.json({ success: false, error: "Date range cannot exceed one year." }, { status: 400 });
   try {
     const data = await getAttendanceReport(session.user.id, user.role, { courseId: params.get("courseId") || undefined, studentId: user.role === "STUDENT" ? session.user.id : params.get("studentId") || undefined, from, to });
     return NextResponse.json({ success: true, data }, { status: 200 });

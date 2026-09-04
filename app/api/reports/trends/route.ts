@@ -14,5 +14,6 @@ export async function GET(request: Request) {
   const from = params.get("from") ? new Date(`${params.get("from")}T00:00:00.000Z`) : undefined;
   const to = params.get("to") ? new Date(`${params.get("to")}T00:00:00.000Z`) : undefined;
   if ((from && Number.isNaN(from.getTime())) || (to && Number.isNaN(to.getTime())) || (from && to && from > to)) return NextResponse.json({ success: false, error: "Invalid date range." }, { status: 400 });
+  if (from && to && to.getTime() - from.getTime() > 366 * 24 * 60 * 60 * 1000) return NextResponse.json({ success: false, error: "Date range cannot exceed one year." }, { status: 400 });
   try { return NextResponse.json({ success: true, data: await getAttendanceTrends(session.user.id, user.role, { courseId: params.get("courseId") || undefined, from, to }) }); } catch { return NextResponse.json({ success: false, error: "Report access denied." }, { status: 403 }); }
 }

@@ -13,7 +13,7 @@ export async function canManageCourse(userId: string, role: UserRole, courseId: 
 export async function getLecturerCourses(userId: string, role: UserRole) {
   const courses = await prisma.course.findMany({
     where: role === "ADMIN" ? undefined : { lecturerAssignments: { some: { lecturerId: userId, active: true } } },
-    include: { enrollments: true, attendanceSessions: { orderBy: { date: "desc" }, take: 1 } },
+    include: { _count: { select: { enrollments: true, attendanceSessions: true } }, attendanceSessions: { orderBy: { date: "desc" }, take: 1 } },
     orderBy: { courseCode: "asc" },
   });
   return courses.map((course) => ({
@@ -24,8 +24,8 @@ export async function getLecturerCourses(userId: string, role: UserRole) {
     unit: course.unit,
     semester: course.semester,
     academicSession: course.academicSession,
-    studentCount: course.enrollments.length,
-    sessionCount: course.attendanceSessions.length,
+    studentCount: course._count.enrollments,
+    sessionCount: course._count.attendanceSessions,
     latestSession: course.attendanceSessions[0] ?? null,
   }));
 }

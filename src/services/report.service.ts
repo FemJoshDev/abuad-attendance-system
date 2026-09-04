@@ -54,6 +54,6 @@ export async function getAttendanceTrends(requesterId: string, role: UserRole, f
   if (role === "LECTURER" && filters.courseId && !(await canManageCourse(requesterId, role, filters.courseId))) throw new Error("Course access denied.");
   const rows = await getAttendanceReport(requesterId, role, filters);
   const courseIds = [...new Set(rows.map((row) => row.course.id))];
-  const sessions = await prisma.attendanceSession.findMany({ where: { ...sessionWhere(filters), ...(courseIds.length ? { courseId: { in: courseIds } } : { courseId: { in: ["__none__"] } }) }, include: { records: { select: { status: true } }, course: { select: { courseCode: true } } }, orderBy: { date: "asc" } });
+  const sessions = await prisma.attendanceSession.findMany({ where: { ...sessionWhere(filters), ...(courseIds.length ? { courseId: { in: courseIds } } : { courseId: { in: ["__none__"] } }) }, include: { records: { where: role === "STUDENT" ? { studentId: requesterId } : undefined, select: { status: true } }, course: { select: { courseCode: true } } }, orderBy: { date: "asc" } });
   return sessions.map((session) => ({ date: session.date, courseCode: session.course.courseCode, present: session.records.filter((record) => record.status === AttendanceStatus.PRESENT).length, absent: session.records.filter((record) => record.status === AttendanceStatus.ABSENT).length, late: session.records.filter((record) => record.status === AttendanceStatus.LATE).length, excused: session.records.filter((record) => record.status === AttendanceStatus.EXCUSED).length, reportRows: rows.length }));
 }
