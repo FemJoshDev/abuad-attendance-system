@@ -87,7 +87,7 @@ function mapStatusLabel(status: AttendanceStatus): "Good standing" | "At risk" |
   return "No data";
 }
 
-function aggregateSessionStatuses(sessions: Array<{ records: Array<{ status: AttendanceStatus }> }>): Omit<CourseAttendanceSummary, "courseId" | "courseCode" | "courseTitle" | "threshold" | "lowAttendance" | "status"> {
+export function aggregateSessionStatuses(sessions: Array<{ records: Array<{ status: AttendanceStatus }> }>): Omit<CourseAttendanceSummary, "courseId" | "courseCode" | "courseTitle" | "threshold" | "lowAttendance" | "status"> {
   const summary = {
     totalSessions: sessions.length,
     present: 0,
