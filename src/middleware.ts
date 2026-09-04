@@ -9,6 +9,7 @@ const protectedPrefixes = [
   "/complaints",
   "/settings",
   "/lecturer",
+  "/admin",
 ];
 
 export default withAuth(
@@ -50,5 +51,6 @@ export const config = {
     "/complaints/:path*",
     "/settings/:path*",
     "/lecturer/:path*",
+    "/admin/:path*",
   ],
 };

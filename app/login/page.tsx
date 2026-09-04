@@ -32,7 +32,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace(session?.user?.role === "LECTURER" || session?.user?.role === "ADMIN" ? "/lecturer" : "/student/dashboard");
+      router.replace(session?.user?.role === "ADMIN" ? "/admin" : session?.user?.role === "LECTURER" ? "/lecturer" : "/student/dashboard");
     }
   }, [router, session?.user?.role, status]);
 
@@ -57,7 +57,7 @@ export default function LoginPage() {
       setError("Invalid email or password.");
     } else {
       const authenticatedSession = await getSession();
-      router.push(authenticatedSession?.user?.role === "LECTURER" || authenticatedSession?.user?.role === "ADMIN" ? "/lecturer" : "/student/dashboard");
+      router.push(authenticatedSession?.user?.role === "ADMIN" ? "/admin" : authenticatedSession?.user?.role === "LECTURER" ? "/lecturer" : "/student/dashboard");
     }
 
     setLoading(false);

@@ -10,7 +10,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
   const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
-  if (!user || (user.role !== "ADMIN" && user.role !== "LECTURER")) return NextResponse.json({ success: false, error: "Access denied." }, { status: 403 });
+  if (!user || user.role !== "ADMIN") return NextResponse.json({ success: false, error: "Access denied." }, { status: 403 });
 
   const { complaintId } = await params;
   let body: { status?: ComplaintStatus };
