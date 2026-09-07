@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { prisma } from "@/src/lib/prisma";
+import { listAdminAttendanceSessions } from "@/src/services/admin.service";
 
 function csvCell(value: string | number | null) {
   const text = value === null ? "" : String(value);
@@ -16,12 +16,8 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const courseId = params.get("courseId") || undefined;
   const lecturerId = params.get("lecturerId") || undefined;
-  const sessions = await prisma.attendanceSession.findMany({
-    where: { ...(courseId ? { courseId } : {}), ...(lecturerId ? { createdById: lecturerId } : {}) },
-    include: { course: { select: { courseCode: true, courseTitle: true } }, createdBy: { select: { fullName: true, email: true } }, records: { include: { student: { select: { fullName: true, matricNumber: true } } }, orderBy: { student: { fullName: "asc" } } } },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    take: 1000,
-  });
+  const sessions = await listAdminAttendanceSessions({ courseId, lecturerId, date: params.get("date") || undefined });
+  if (params.get("format") !== "csv") return NextResponse.json({ success: true, data: sessions });
   const rows = [["sessionId", "courseCode", "courseTitle", "date", "status", "lecturer", "lecturerEmail", "student", "matricNumber", "attendanceStatus"].map(csvCell).join(",")];
   for (const item of sessions) {
     const records = item.records.length ? item.records : [{ student: { fullName: "", matricNumber: null }, status: "ABSENT" }];

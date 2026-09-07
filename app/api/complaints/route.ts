@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { createComplaint, getUserComplaints } from "@/src/services/complaint.service";
 import { prisma } from "@/src/lib/prisma";
+import { createNotification } from "@/src/services/notification.service";
 
 const isEnumValue = <T extends Record<string, string>>(value: unknown, enumObject: T): value is T[keyof T] => typeof value === "string" && Object.values(enumObject).includes(value);
 
@@ -45,6 +46,8 @@ export async function POST(request: Request) {
 
   try {
     const data = await createComplaint(session.user.id, { subject, description, category: body.category, priority: body.priority });
+    const admins = await prisma.user.findMany({ where: { role: "ADMIN", isActive: true }, select: { id: true } });
+    await Promise.all(admins.map((admin) => createNotification({ userId: admin.id, title: "New student complaint", message: `${subject} requires administrative review.`, type: "SYSTEM" })));
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch {
     return NextResponse.json({ success: false, error: "Unable to submit complaint." }, { status: 500 });

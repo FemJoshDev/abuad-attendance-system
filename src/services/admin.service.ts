@@ -24,10 +24,23 @@ export async function getAdminDashboard() {
 export async function listAdminUsers(search: string, role: UserRole | undefined, page: number, limit: number) {
   const where = { ...(role ? { role } : {}), ...(search ? { OR: [{ fullName: { contains: search, mode: "insensitive" as const } }, { email: { contains: search, mode: "insensitive" as const } }, { matricNumber: { contains: search, mode: "insensitive" as const } }] } : {}) };
   const [users, total] = await Promise.all([
-    prisma.user.findMany({ where, select: { id: true, fullName: true, email: true, matricNumber: true, role: true, avatarUrl: true, createdAt: true, _count: { select: { enrollments: true, complaints: true } } }, orderBy: { fullName: "asc" }, skip: (page - 1) * limit, take: limit }),
+    prisma.user.findMany({ where, select: { id: true, fullName: true, email: true, matricNumber: true, role: true, isActive: true, avatarUrl: true, createdAt: true, _count: { select: { enrollments: true, complaints: true } } }, orderBy: { fullName: "asc" }, skip: (page - 1) * limit, take: limit }),
     prisma.user.count({ where }),
   ]);
   return { users, total, page, limit };
+}
+
+export function setUserActiveState(userId: string, isActive: boolean) {
+  return prisma.user.update({ where: { id: userId }, data: { isActive }, select: { id: true, isActive: true } });
+}
+
+export function listAdminAttendanceSessions(filters: { courseId?: string; lecturerId?: string; date?: string }) {
+  return prisma.attendanceSession.findMany({
+    where: { ...(filters.courseId ? { courseId: filters.courseId } : {}), ...(filters.lecturerId ? { createdById: filters.lecturerId } : {}), ...(filters.date ? { date: new Date(`${filters.date}T00:00:00.000Z`) } : {}) },
+    include: { course: { select: { courseCode: true, courseTitle: true } }, createdBy: { select: { fullName: true, email: true } }, records: { include: { student: { select: { fullName: true, matricNumber: true } } }, orderBy: { student: { fullName: "asc" } } } },
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    take: 500,
+  });
 }
 
 export async function listAdminCourses(search: string) {
