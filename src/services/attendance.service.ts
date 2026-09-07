@@ -85,18 +85,6 @@ export function toPercentage(attended: number, eligibleSessions: number): number
   return Number(((attended / eligibleSessions) * 100).toFixed(1));
 }
 
-function mapStatusLabel(status: AttendanceStatus): "Good standing" | "At risk" | "No data" {
-  if (status === AttendanceStatus.PRESENT || status === AttendanceStatus.LATE) {
-    return "Good standing";
-  }
-
-  if (status === AttendanceStatus.ABSENT) {
-    return "At risk";
-  }
-
-  return "No data";
-}
-
 export function aggregateSessionStatuses(sessions: Array<{ records: Array<{ status: AttendanceStatus }> }>): Omit<CourseAttendanceSummary, "courseId" | "courseCode" | "courseTitle" | "threshold" | "lowAttendance" | "status"> {
   const summary = {
     totalSessions: sessions.length,

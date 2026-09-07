@@ -8,7 +8,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ cou
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
   const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
-  if (!user || (user.role !== "LECTURER" && user.role !== "ADMIN")) return NextResponse.json({ success: false, error: "Access denied." }, { status: 403 });
+  if (!user || user.role !== "LECTURER") return NextResponse.json({ success: false, error: "Access denied." }, { status: 403 });
   const { courseId } = await params;
   let body: { date?: unknown; startTime?: unknown; endTime?: unknown };
   try { body = await request.json(); } catch { return NextResponse.json({ success: false, error: "Invalid request body." }, { status: 400 }); }

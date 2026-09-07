@@ -65,5 +65,5 @@ export async function enrollStudent(courseId: string, studentId: string, academi
 }
 
 export async function listAdminComplaints(status?: ComplaintStatus) {
-  return prisma.complaint.findMany({ where: status ? { status } : undefined, include: { user: { select: { id: true, fullName: true, email: true, matricNumber: true } } }, orderBy: { createdAt: "desc" }, take: 100 });
+  return prisma.complaint.findMany({ where: status ? { status } : undefined, include: { user: { select: { id: true, fullName: true, email: true, matricNumber: true } }, assignedLecturer: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: "desc" }, take: 100 });
 }

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/src/lib/prisma";
+import { getObjectStorage } from "@/src/lib/storage";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -26,20 +27,14 @@ export async function POST(request: Request) {
   }
 
   const extension = file.type.split("/")[1].replace("jpeg", "jpg");
-  const fileName = `${session.user.id}-${crypto.randomUUID()}.${extension}`;
-  const uploadDirectory = process.env.NODE_ENV === "production" ? null : `${process.cwd()}\\public\\uploads\\avatars`;
-  if (!uploadDirectory) return NextResponse.json({ success: false, error: "Profile photo storage is not configured." }, { status: 503 });
-
-  const fs = await import("node:fs/promises");
-  const path = await import("node:path");
-  await fs.mkdir(uploadDirectory, { recursive: true });
-  await fs.writeFile(path.join(uploadDirectory, fileName), Buffer.from(await file.arrayBuffer()));
-
-  const avatarUrl = `/uploads/avatars/${fileName}`;
+  const key = `avatars/${session.user.id}/${crypto.randomUUID()}.${extension}`;
+  const storage = getObjectStorage();
+  const stored = await storage.put({ key, body: new Uint8Array(await file.arrayBuffer()), contentType: file.type });
   const previous = await prisma.user.findUnique({ where: { id: session.user.id }, select: { avatarUrl: true } });
-  const data = await prisma.user.update({ where: { id: session.user.id }, data: { avatarUrl }, select: { avatarUrl: true } });
-  if (previous?.avatarUrl?.startsWith("/uploads/avatars/")) {
-    await fs.unlink(path.join(process.cwd(), "public", previous.avatarUrl)).catch(() => undefined);
+  const data = await prisma.user.update({ where: { id: session.user.id }, data: { avatarUrl: stored.url }, select: { avatarUrl: true } });
+  if (previous?.avatarUrl) {
+    const previousKey = previous.avatarUrl.includes("/avatars/") ? `avatars/${previous.avatarUrl.split("/avatars/")[1]}` : null;
+    if (previousKey) await storage.delete(previousKey);
   }
   return NextResponse.json({ success: true, data }, { status: 200 });
 }

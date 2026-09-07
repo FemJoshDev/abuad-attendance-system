@@ -57,6 +57,7 @@ model User {
   matricNumber  String?   @unique
   avatarUrl     String?
   role          UserRole  @default(STUDENT)
+  isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -68,6 +69,9 @@ model User {
   preferences    UserPreferences?
   lecturerAssignments LecturerCourseAssignment[]
   createdAttendanceSessions AttendanceSession[] @relation("SessionCreator")
+  reopenedAttendanceSessions AttendanceSession[] @relation("SessionReopener")
+  assignedComplaints Complaint[] @relation("AssignedLecturer")
+  assignedByComplaints Complaint[] @relation("AssignedByAdmin")
 
   @@index([email])
   @@index([role])
@@ -150,11 +154,16 @@ model AttendanceSession {
   startTime DateTime?
   endTime   DateTime?
   isOpen    Boolean  @default(true)
+  openedAt  DateTime  @default(now())
+  closedAt  DateTime?
+  reopenedAt DateTime?
   createdById String?
+  reopenedById String?
   createdAt DateTime @default(now())
 
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   createdBy User? @relation("SessionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  reopenedBy User? @relation("SessionReopener", fields: [reopenedById], references: [id], onDelete: SetNull)
   records   AttendanceRecord[]
 
   @@index([courseId, date])
@@ -200,14 +209,21 @@ model Complaint {
   description String
   priority    ComplaintPriority @default(MEDIUM)
   status      ComplaintStatus   @default(PENDING)
+  assignedLecturerId String?
+  assignedById String?
+  lecturerResponse String?
+  respondedAt DateTime?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedLecturer User?       @relation("AssignedLecturer", fields: [assignedLecturerId], references: [id], onDelete: SetNull)
+  assignedBy User?             @relation("AssignedByAdmin", fields: [assignedById], references: [id], onDelete: SetNull)
 
   @@index([userId, status])
   @@index([createdAt])
   @@index([priority])
+  @@index([assignedLecturerId, status])
 }
 
 model UserPreferences {

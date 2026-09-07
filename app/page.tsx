@@ -3,8 +3,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { academicData, attendanceNotifications, courses, student } from "@/mock/academicData";
-import type { Course, Semester } from "@/mock/academicData";
+import { academicData, courses, student } from "@/mock/academicData";
+import type { Semester } from "@/mock/academicData";
 import type { CourseSummary } from "@/src/types/course";
 import ComplaintPanel from "@/app/complaints/ComplaintPanel";
 import SettingsPanel from "@/app/settings/SettingsPanel";
@@ -205,7 +205,7 @@ function CoursesPage() {
 
         const payload = await response.json();
         const items = Array.isArray(payload.data)
-          ? payload.data.map((course: Record<string, any>) => ({
+          ? payload.data.map((course: Record<string, unknown>) => ({
               id: String(course.id ?? ""),
               code: String(course.code ?? course.courseCode ?? ""),
               title: String(course.title ?? course.courseTitle ?? ""),
@@ -216,7 +216,7 @@ function CoursesPage() {
               updated: String(course.updated ?? new Date().toISOString()),
               present: Number(course.present ?? 0),
               total: Number(course.total ?? 0),
-              status: course.status ?? "Good standing",
+              status: course.status === "Watch closely" ? "Watch closely" : "Good standing",
               unit: Number(course.unit ?? 0),
               semester: String(course.semester ?? ""),
               academicSession: String(course.academicSession ?? ""),
@@ -259,20 +259,17 @@ function Toggle({ label, text, checked: initial }: { label: string; text: string
 export default function Home() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const [path, setPath] = useState(""); const [noticeItems, setNoticeItems] = useState<Notice[]>([]); const [unreadCount, setUnreadCount] = useState(0); const [theme, setTheme] = useState<Theme>("light");
+  const [path, setPath] = useState(""); const [noticeItems, setNoticeItems] = useState<Notice[]>([]); const [unreadCount, setUnreadCount] = useState(0); const [theme, setTheme] = useState<Theme>(() => { if (typeof window === "undefined") return "light"; const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY); return savedTheme === "light" || savedTheme === "dark" ? savedTheme : "light"; });
 
   useEffect(() => {
     const route = () => setPath(window.location.pathname);
     route();
     window.addEventListener("popstate", route);
 
-    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
-    const preferredTheme = savedTheme === "light" || savedTheme === "dark" ? savedTheme : "light";
-    setTheme(preferredTheme);
-    document.documentElement.setAttribute("data-theme", preferredTheme);
+    document.documentElement.setAttribute("data-theme", theme);
 
     return () => window.removeEventListener("popstate", route);
-  }, []);
+  }, [theme]);
 
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
@@ -298,7 +295,7 @@ export default function Home() {
   }, [status]);
 
   function goToDashboard() {
-    router.push("/student/dashboard");
+    router.push(session?.user?.role === "ADMIN" ? "/admin/dashboard" : session?.user?.role === "LECTURER" ? "/lecturer/dashboard" : "/student/dashboard");
   }
 
   function logout() {

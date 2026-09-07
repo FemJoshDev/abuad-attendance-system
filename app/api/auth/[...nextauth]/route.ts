@@ -1,5 +1,5 @@
 import NextAuth from "next-auth";
-import type { NextAuthOptions, User } from "next-auth";
+import type { NextAuthOptions, Session, User } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { UserRole } from "@prisma/client";
@@ -46,7 +46,15 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
-        if (!user || !user.passwordHash) {
+        if (!user || !user.isActive || !user.passwordHash) {
+          return null;
+        }
+
+        if (user.role === "STUDENT" && identifier.toLowerCase() !== user.matricNumber?.toLowerCase()) {
+          return null;
+        }
+
+        if (user.role === "LECTURER" && (!user.email.toLowerCase().endsWith("@abuad.edu.ng") || !identifier.toLowerCase().endsWith("@abuad.edu.ng"))) {
           return null;
         }
 
@@ -74,7 +82,7 @@ export const authOptions: NextAuthOptions = {
 
       return token;
     },
-    async session({ session, token }: { session: any; token: JWT }) {
+    async session({ session, token }: { session: Session; token: JWT }) {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = (token.role as UserRole) ?? "STUDENT";

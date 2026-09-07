@@ -56,7 +56,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ cou
   }
 
   const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
-  if (!user || (user.role !== "LECTURER" && user.role !== "ADMIN")) {
+  if (!user || user.role !== "STUDENT") {
     return NextResponse.json({ success: false, error: "Access denied." }, { status: 403 });
   }
 

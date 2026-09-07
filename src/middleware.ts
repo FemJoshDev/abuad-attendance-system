@@ -33,7 +33,12 @@ export default withAuth(
           (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
         );
 
-        return !isProtected || Boolean(token);
+        if (!isProtected) return true;
+        if (!token) return false;
+        if (pathname.startsWith("/admin")) return token.role === "ADMIN";
+        if (pathname.startsWith("/lecturer")) return token.role === "LECTURER";
+        if (pathname.startsWith("/student") || pathname.startsWith("/courses") || pathname.startsWith("/notifications") || pathname.startsWith("/complaints") || pathname.startsWith("/settings")) return token.role === "STUDENT";
+        return true;
       },
     },
     pages: {
