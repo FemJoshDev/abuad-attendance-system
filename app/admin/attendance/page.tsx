@@ -20,7 +20,12 @@ export default function AdminAttendancePage() {
     setSessions(payload.data ?? []);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    fetch("/api/admin/attendance")
+      .then(async (response) => { if (!response.ok) throw new Error(); return response.json(); })
+      .then((payload) => setSessions(payload.data ?? []))
+      .catch(() => setError("Unable to load attendance records."));
+  }, []);
 
   return <main><h1>Attendance Administration</h1><p>Review sessions and records through the protected administrative API.</p><form onSubmit={(event) => { event.preventDefault(); load(); }}><input value={courseId} onChange={(event) => setCourseId(event.target.value)} placeholder="Course ID" /><input value={lecturerId} onChange={(event) => setLecturerId(event.target.value)} placeholder="Lecturer ID" /><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /><button type="submit">Filter</button></form><a href="/api/admin/attendance?format=csv" download="attendance-export.csv">Download Attendance CSV</a>{error && <p role="alert">{error}</p>}{sessions.map((session) => <article key={session.id}><h2>{session.course.courseCode} · {new Date(session.date).toLocaleDateString()}</h2><p>{session.isOpen ? "OPEN" : "CLOSED"} · {session.createdBy?.fullName ?? "Unknown lecturer"} · {session.records.length} records</p>{session.records.map((record) => <p key={`${session.id}-${record.student.matricNumber}`}>{record.student.fullName} ({record.student.matricNumber ?? "No matric"}): {record.status}</p>)}</article>)}</main>;
 }

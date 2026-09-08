@@ -3,8 +3,8 @@ import { ComplaintStatus, UserRole } from "@prisma/client";
 import { prisma } from "@/src/lib/prisma";
 
 export async function requireAdmin(userId: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true } });
-  if (!user || user.role !== UserRole.ADMIN) throw new Error("Admin access required.");
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true, isActive: true } });
+  if (!user || user.role !== UserRole.ADMIN || !user.isActive) throw new Error("Admin access required.");
   return user;
 }
 
