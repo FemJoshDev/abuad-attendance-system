@@ -40,6 +40,7 @@ async function main() {
       fullName: "Dr. O. Williams",
       matricNumber: null,
       role: UserRole.LECTURER,
+      isActive: true,
       passwordHash: await hashPassword(lecturerPassword),
     },
     create: {
@@ -47,6 +48,7 @@ async function main() {
       email: "dr.williams@abuad.edu.ng",
       matricNumber: null,
       role: UserRole.LECTURER,
+      isActive: true,
       passwordHash: await hashPassword(lecturerPassword),
     },
   });

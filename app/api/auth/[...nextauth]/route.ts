@@ -74,6 +74,20 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      const destination = new URL(url, baseUrl);
+      const allowedDestinations = new Set([
+        "/student/dashboard",
+        "/lecturer/dashboard",
+        "/admin/dashboard",
+      ]);
+
+      if (destination.origin === baseUrl && allowedDestinations.has(destination.pathname)) {
+        return destination.toString();
+      }
+
+      return baseUrl;
+    },
     async jwt({ token, user }: { token: JWT; user?: User }) {
       if (user) {
         token.id = user.id;

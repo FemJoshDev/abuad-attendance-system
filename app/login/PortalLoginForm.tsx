@@ -30,7 +30,12 @@ export default function PortalLoginForm({ role }: { role: PortalRole }) {
     if (!identifier.trim() || !password) { setError(`Enter your ${config.label.toLowerCase()} and password.`); return; }
     setError("");
     setLoading(true);
-    const result = await signIn("credentials", { email: identifier.trim(), password, redirect: false });
+    const result = await signIn("credentials", {
+      email: identifier.trim(),
+      password,
+      callbackUrl: config.destination,
+      redirect: false,
+    });
     if (result?.error) {
       setError(`Invalid ${config.label.toLowerCase()} or password, or this account is not authorized for the ${config.title}.`);
     } else {

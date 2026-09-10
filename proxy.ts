@@ -12,23 +12,19 @@ const protectedPrefixes = [
   "/admin",
 ];
 
+const publicPortalLoginPaths = ["/student/login", "/lecturer/login", "/admin/login"];
+
 export default withAuth(
-  function middleware(request) {
+  function proxy(request) {
     const { pathname } = request.nextUrl;
-    const isProtected = protectedPrefixes.some(
-      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-    );
-
-    if (!isProtected) {
-      return NextResponse.next();
-    }
-
+    if (publicPortalLoginPaths.includes(pathname)) return NextResponse.next();
     return NextResponse.next();
   },
   {
     callbacks: {
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl;
+        if (publicPortalLoginPaths.includes(pathname)) return true;
         const isProtected = protectedPrefixes.some(
           (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
         );
@@ -49,6 +45,7 @@ export default withAuth(
 
 export const config = {
   matcher: [
+    "/student/login",
     "/student/dashboard/:path*",
     "/courses/:path*",
     "/notifications/:path*",
