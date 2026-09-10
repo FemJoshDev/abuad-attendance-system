@@ -1,0 +1,12 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+type Report = { summary?: { totalSessions?: number; totalRecords?: number; present?: number; absent?: number; late?: number }; trends?: unknown[] };
+export default function AdminReportsPage() {
+  const [report, setReport] = useState<Report | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => { fetch("/api/reports/attendance").then(async (response) => { if (!response.ok) throw new Error(); return response.json(); }).then((payload) => setReport(payload.data)).catch(() => setError("Unable to load attendance reports.")); }, []);
+  const summary = report?.summary ?? {};
+  return <main className="min-h-screen bg-[var(--background)] px-5 py-8 text-[var(--ink)] md:px-10"><div className="mx-auto max-w-7xl"><p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--outline)]">Insights</p><h1 className="mt-2 font-[Manrope] text-3xl font-extrabold text-[var(--primary)]">Attendance reports</h1><p className="mt-2 text-sm text-[var(--muted)]">System-wide attendance performance and exportable records.</p><a className="mt-6 inline-flex rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-bold text-white" href="/api/admin/attendance?format=csv">Download attendance CSV</a>{error && <p className="mt-5 text-sm text-red-700" role="alert">{error}</p>}<div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[["Sessions", summary.totalSessions ?? 0], ["Records", summary.totalRecords ?? 0], ["Present", summary.present ?? 0], ["Late", summary.late ?? 0]].map(([label, value]) => <article className="rounded-lg border border-[var(--outline-light)] bg-[var(--surface)] p-5 shadow-sm" key={label as string}><p className="text-xs font-bold uppercase tracking-wide text-[var(--outline)]">{label}</p><p className="mt-3 font-[Manrope] text-3xl font-extrabold text-[var(--primary)]">{value}</p></article>)}</div><section className="mt-8 rounded-lg border border-[var(--outline-light)] bg-[var(--surface)] p-6 shadow-sm"><h2 className="font-[Manrope] text-xl font-bold">Low attendance monitoring</h2><p className="mt-2 text-sm text-[var(--muted)]">Use the attendance administration view to filter sessions by course and inspect individual student records.</p><a className="mt-4 inline-block text-sm font-bold text-[var(--primary)] underline" href="/admin/attendance">Open attendance administration</a></section></div></main>;
+}
