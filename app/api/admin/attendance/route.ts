@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { listAdminAttendanceSessions } from "@/src/services/admin.service";
+import { getAdminCourseAttendance, listAdminAttendanceSessions } from "@/src/services/admin.service";
 
 function csvCell(value: string | number | null) {
   const text = value === null ? "" : String(value);
@@ -16,6 +16,12 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const courseId = params.get("courseId") || undefined;
   const lecturerId = params.get("lecturerId") || undefined;
+  if (params.get("format") === "course-csv" && courseId) {
+    const rows = await getAdminCourseAttendance(courseId);
+    const header = ["courseCode", "courseTitle", "studentName", "matricNumber", "totalSessionsHeld", "sessionsAttended", "attendancePercentage", "qualificationStatus"].map(csvCell).join(",");
+    const body = rows.map((row) => [row.courseCode, row.courseTitle, row.studentName, row.matricNumber, row.totalSessionsHeld, row.sessionsAttended, row.attendancePercentage, row.status].map(csvCell).join(","));
+    return new NextResponse([header, ...body].join("\n"), { status: 200, headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename=${rows[0]?.courseCode ?? "course"}-attendance.csv`, "Cache-Control": "no-store" } });
+  }
   const sessions = await listAdminAttendanceSessions({ courseId, lecturerId, date: params.get("date") || undefined });
   if (params.get("format") !== "csv") return NextResponse.json({ success: true, data: sessions });
   const rows = [["sessionId", "courseCode", "courseTitle", "date", "status", "lecturer", "lecturerEmail", "student", "matricNumber", "attendanceStatus"].map(csvCell).join(",")];

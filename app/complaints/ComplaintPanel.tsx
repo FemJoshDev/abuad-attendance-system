@@ -12,8 +12,9 @@ type Complaint = {
   createdAt: string;
   updatedAt: string;
 };
+type Course = { id: string; courseCode: string; courseTitle: string };
 
-const initialForm = { subject: "", category: "TECHNICAL_ISSUE", priority: "MEDIUM", description: "" };
+const initialForm = { subject: "", category: "TECHNICAL_ISSUE", priority: "MEDIUM", description: "", courseId: "" };
 
 function EmptyState({ title, text }: { title: string; text: string }) {
   return <div className="empty-state card"><span className="empty-icon">○</span><h3>{title}</h3><p>{text}</p></div>;
@@ -22,6 +23,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
 export default function ComplaintPanel() {
   const [form, setForm] = useState(initialForm);
   const [items, setItems] = useState<Complaint[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -44,6 +46,7 @@ export default function ComplaintPanel() {
 
   useEffect(() => {
     const load = window.setTimeout(loadComplaints, 0);
+    fetch("/api/courses").then((response) => response.ok ? response.json() : null).then((payload) => setCourses(payload?.data ?? [])).catch(() => undefined);
     return () => window.clearTimeout(load);
   }, []);
 

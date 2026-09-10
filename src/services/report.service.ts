@@ -41,7 +41,8 @@ export async function getAttendanceReport(requesterId: string, role: UserRole, f
   return enrollments.map((enrollment) => {
     const courseSessions = sessions.filter((session) => session.courseId === enrollment.courseId).map((session) => ({ records: session.records.filter((record) => record.studentId === enrollment.studentId) }));
     const summary = aggregateSessionStatuses(courseSessions);
-    return { student: enrollment.student, course: enrollment.course, ...summary, threshold: attendanceThreshold, lowAttendance: summary.attendancePercentage !== null && summary.attendancePercentage < attendanceThreshold };
+    const eligibility = { totalSessionsHeld: summary.totalSessions, sessionsAttended: summary.attended, attendancePercentage: summary.attendancePercentage, eligible: summary.attendancePercentage !== null && summary.attendancePercentage >= 50, status: summary.attendancePercentage === null ? "NO DATA" : summary.attendancePercentage >= 50 ? "GOOD TO GO" : "INELIGIBLE" };
+    return { student: enrollment.student, course: enrollment.course, ...summary, threshold: attendanceThreshold, lowAttendance: summary.attendancePercentage !== null && summary.attendancePercentage < attendanceThreshold, eligibility };
   });
 }
 

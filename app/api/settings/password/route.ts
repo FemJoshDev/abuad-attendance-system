@@ -9,9 +9,10 @@ export async function PATCH(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
 
-  let body: { currentPassword?: unknown; newPassword?: unknown };
+  let body: { currentPassword?: unknown; newPassword?: unknown; confirmPassword?: unknown };
   try { body = await request.json(); } catch { return NextResponse.json({ success: false, error: "Invalid request body." }, { status: 400 }); }
-  if (typeof body.currentPassword !== "string" || typeof body.newPassword !== "string") return NextResponse.json({ success: false, error: "Both passwords are required." }, { status: 400 });
+  if (typeof body.currentPassword !== "string" || typeof body.newPassword !== "string" || typeof body.confirmPassword !== "string") return NextResponse.json({ success: false, error: "Current, new, and confirmation passwords are required." }, { status: 400 });
+  if (body.newPassword !== body.confirmPassword) return NextResponse.json({ success: false, error: "New password and confirmation do not match." }, { status: 400 });
   const passwordError = validatePassword(body.newPassword);
   if (passwordError) return NextResponse.json({ success: false, error: passwordError }, { status: 400 });
 

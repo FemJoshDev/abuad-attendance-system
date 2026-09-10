@@ -14,7 +14,7 @@ test("excused sessions are removed from the denominator", () => {
   const result = calculateAttendance({ present: 2, absent: 1, late: 0, excused: 2 });
   assert.equal(result.eligibleSessions, 3);
   assert.equal(result.attendancePercentage, 66.7);
-  assert.equal(result.lowAttendance, true);
+  assert.equal(result.lowAttendance, false);
 });
 
 test("empty attendance has no percentage", () => {

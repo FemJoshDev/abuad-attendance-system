@@ -34,7 +34,9 @@ export async function createLecturerSession(userId: string, role: UserRole, cour
   if (!(await canManageCourse(userId, role, courseId))) throw new Error("Course access denied.");
   const conflict = await prisma.attendanceSession.findFirst({ where: { courseId, isOpen: true } });
   if (conflict) throw new Error("An attendance session is already open for this course.");
-  return prisma.attendanceSession.create({ data: { courseId, date: input.date, startTime: input.startTime, endTime: input.endTime, createdById: userId, isOpen: true } });
+  const session = await prisma.attendanceSession.create({ data: { courseId, date: input.date, startTime: input.startTime, endTime: input.endTime, createdById: userId, isOpen: true }, include: { course: { select: { courseCode: true, courseTitle: true, enrollments: { select: { studentId: true } } } } } });
+  await prisma.notification.createMany({ data: session.course.enrollments.map((enrollment) => ({ userId: enrollment.studentId, title: "Attendance Opened", message: `Lecturer opened attendance for ${session.course.courseCode} - ${session.course.courseTitle}. Click here to mark attendance.`, type: "ATTENDANCE" as const })) });
+  return session;
 }
 
 export async function getLecturerSessionRoster(userId: string, role: UserRole, sessionId: string) {

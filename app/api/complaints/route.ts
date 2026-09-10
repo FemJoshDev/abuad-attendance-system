@@ -40,12 +40,17 @@ export async function POST(request: Request) {
 
   const subject = typeof body.subject === "string" ? body.subject.trim() : "";
   const description = typeof body.description === "string" ? body.description.trim() : "";
+  const courseId = typeof body.courseId === "string" && body.courseId ? body.courseId : undefined;
   if (!subject || subject.length > 200 || !description || description.length > 5000 || !isEnumValue(body.category, ComplaintCategory) || !isEnumValue(body.priority, ComplaintPriority)) {
     return NextResponse.json({ success: false, error: "Provide a valid subject, category, priority, and description." }, { status: 400 });
   }
 
   try {
-    const data = await createComplaint(session.user.id, { subject, description, category: body.category, priority: body.priority });
+    if (courseId) {
+      const enrollment = await prisma.enrollment.findFirst({ where: { studentId: session.user.id, courseId } });
+      if (!enrollment) return NextResponse.json({ success: false, error: "You can only select a course you are enrolled in." }, { status: 403 });
+    }
+    const data = await createComplaint(session.user.id, { subject, description, courseId, category: body.category, priority: body.priority });
     const admins = await prisma.user.findMany({ where: { role: "ADMIN", isActive: true }, select: { id: true } });
     await Promise.all(admins.map((admin) => createNotification({ userId: admin.id, title: "New student complaint", message: `${subject} requires administrative review.`, type: "SYSTEM" })));
     return NextResponse.json({ success: true, data }, { status: 201 });

@@ -44,6 +44,7 @@ enum ComplaintPriority {
 
 enum ComplaintStatus {
   PENDING
+  ASSIGNED_TO_LECTURER
   IN_REVIEW
   RESOLVED
   CLOSED
@@ -65,9 +66,9 @@ model User {
   enrollments    Enrollment[]
   attendanceRecords AttendanceRecord[]
   notifications  Notification[]
-  complaints     Complaint[]
   preferences    UserPreferences?
   lecturerAssignments LecturerCourseAssignment[]
+  complaints      Complaint[]
   createdAttendanceSessions AttendanceSession[] @relation("SessionCreator")
   reopenedAttendanceSessions AttendanceSession[] @relation("SessionReopener")
   assignedComplaints Complaint[] @relation("AssignedLecturer")
@@ -100,6 +101,8 @@ model Course {
   courseTitle     String
   description     String?
   unit            Int?
+  department      String?
+  level           String?
   semester        String?
   academicSession String?
   createdAt       DateTime          @default(now())
@@ -108,6 +111,7 @@ model Course {
   enrollments     Enrollment[]
   attendanceSessions AttendanceSession[]
   lecturerAssignments LecturerCourseAssignment[]
+  complaints        Complaint[]
 
   @@index([courseCode])
   @@index([semester])
@@ -207,6 +211,7 @@ model Complaint {
   subject     String
   category    ComplaintCategory @default(OTHER)
   description String
+  courseId    String?
   priority    ComplaintPriority @default(MEDIUM)
   status      ComplaintStatus   @default(PENDING)
   assignedLecturerId String?
@@ -219,11 +224,13 @@ model Complaint {
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignedLecturer User?       @relation("AssignedLecturer", fields: [assignedLecturerId], references: [id], onDelete: SetNull)
   assignedBy User?             @relation("AssignedByAdmin", fields: [assignedById], references: [id], onDelete: SetNull)
+  course      Course?          @relation(fields: [courseId], references: [id], onDelete: SetNull)
 
   @@index([userId, status])
   @@index([createdAt])
   @@index([priority])
   @@index([assignedLecturerId, status])
+  @@index([courseId])
 }
 
 model UserPreferences {

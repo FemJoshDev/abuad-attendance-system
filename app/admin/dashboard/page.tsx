@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 type Session = { id: string; date: string; isOpen: boolean; course: { courseCode: string; courseTitle: string }; _count: { records: number } };
-type Dashboard = { students: number; lecturers: number; courses: number; sessions: number; openComplaints: number; recentSessions: Session[] };
+type Dashboard = { students: number; lecturers: number; courses: number; sessions: number; openComplaints: number; totalEnrollments: number; registeredToday: number; recentSessions: Session[] };
 
 const cards = [
   ["Students", "students", "Registered student accounts"],
@@ -11,6 +11,8 @@ const cards = [
   ["Courses", "courses", "Courses in the catalogue"],
   ["Attendance sessions", "sessions", "Sessions across all courses"],
   ["Open complaints", "openComplaints", "Pending or in review"],
+  ["Course enrollments", "totalEnrollments", "Total registrations"],
+  ["Registered today", "registeredToday", "New registrations today"],
 ] as const;
 
 export default function AdminDashboardPage() {

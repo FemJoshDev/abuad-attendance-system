@@ -8,6 +8,7 @@ export type ComplaintInput = {
   category: ComplaintCategory;
   priority: ComplaintPriority;
   description: string;
+  courseId?: string;
 };
 
 export type ComplaintItem = {
@@ -56,7 +57,8 @@ export async function updateComplaintStatus(complaintId: string, status: Complai
     if (!complaint) throw new Error("Complaint not found.");
 
     const allowedTransitions: Record<ComplaintStatus, ComplaintStatus[]> = {
-      PENDING: [ComplaintStatus.IN_REVIEW, ComplaintStatus.RESOLVED, ComplaintStatus.CLOSED],
+      PENDING: [ComplaintStatus.ASSIGNED_TO_LECTURER, ComplaintStatus.IN_REVIEW, ComplaintStatus.RESOLVED, ComplaintStatus.CLOSED],
+      ASSIGNED_TO_LECTURER: [ComplaintStatus.IN_REVIEW, ComplaintStatus.RESOLVED, ComplaintStatus.CLOSED],
       IN_REVIEW: [ComplaintStatus.RESOLVED, ComplaintStatus.CLOSED],
       RESOLVED: [],
       CLOSED: [],
@@ -85,7 +87,13 @@ export function listAssignedLecturerComplaints(userId: string) {
 export async function assignComplaint(adminId: string, complaintId: string, lecturerId: string) {
   const lecturer = await prisma.user.findFirst({ where: { id: lecturerId, role: UserRole.LECTURER, isActive: true, email: { endsWith: "@abuad.edu.ng", mode: "insensitive" } }, select: { id: true } });
   if (!lecturer) throw new Error("Active ABUAD lecturer not found.");
-  const complaint = await prisma.complaint.update({ where: { id: complaintId }, data: { assignedLecturerId: lecturerId, assignedById: adminId, status: ComplaintStatus.IN_REVIEW }, include: { user: { select: { id: true } } } });
+  const existingComplaint = await prisma.complaint.findUnique({ where: { id: complaintId }, select: { courseId: true } });
+  if (!existingComplaint) throw new Error("Complaint not found.");
+  if (existingComplaint.courseId) {
+    const assignment = await prisma.lecturerCourseAssignment.findFirst({ where: { courseId: existingComplaint.courseId, lecturerId, active: true } });
+    if (!assignment) throw new Error("Lecturer is not assigned to the complaint course.");
+  }
+  const complaint = await prisma.complaint.update({ where: { id: complaintId }, data: { assignedLecturerId: lecturerId, assignedById: adminId, status: ComplaintStatus.ASSIGNED_TO_LECTURER }, include: { user: { select: { id: true } } } });
   await createNotification({ userId: lecturerId, title: "Complaint assigned", message: `Complaint ${complaint.subject} requires your review.`, type: NotificationType.SYSTEM });
   return complaint;
 }

@@ -1,5 +1,6 @@
 import { PrismaClient, UserRole, AttendanceStatus, NotificationType, ComplaintCategory, ComplaintPriority, ComplaintStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { DEFAULT_LECTURER_PASSWORD, DEFAULT_STUDENT_PASSWORD } from "@/src/lib/default-passwords";
 
 const prisma = new PrismaClient();
 
@@ -12,8 +13,8 @@ async function main() {
     throw new Error("Demo seed data is disabled in production.");
   }
 
-  const studentPassword = process.env.DEMO_STUDENT_PASSWORD ?? (process.env.NODE_ENV === "development" ? "Student123!" : "");
-  const lecturerPassword = process.env.DEMO_LECTURER_PASSWORD ?? (process.env.NODE_ENV === "development" ? "Lecturer123!" : "");
+  const studentPassword = DEFAULT_STUDENT_PASSWORD;
+  const lecturerPassword = DEFAULT_LECTURER_PASSWORD;
   const adminPassword = process.env.DEMO_ADMIN_PASSWORD ?? (process.env.NODE_ENV === "development" ? "Admin123!" : "");
   if (!studentPassword || !lecturerPassword || !adminPassword) throw new Error("Demo seed passwords must be provided outside development.");
 

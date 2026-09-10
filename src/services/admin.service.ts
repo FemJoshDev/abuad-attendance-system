@@ -1,6 +1,7 @@
 import { ComplaintStatus, UserRole } from "@prisma/client";
 
 import { prisma } from "@/src/lib/prisma";
+import { calculateEligibility } from "@/src/services/attendance.service";
 
 export async function requireAdmin(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true, isActive: true } });
@@ -9,16 +10,19 @@ export async function requireAdmin(userId: string) {
 }
 
 export async function getAdminDashboard() {
-  const [students, lecturers, courses, sessions, complaints, unreadNotifications, recentSessions] = await Promise.all([
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const [students, lecturers, courses, sessions, complaints, unreadNotifications, totalEnrollments, registeredToday, recentSessions] = await Promise.all([
     prisma.user.count({ where: { role: UserRole.STUDENT } }),
     prisma.user.count({ where: { role: UserRole.LECTURER } }),
     prisma.course.count(),
     prisma.attendanceSession.count(),
     prisma.complaint.count({ where: { status: { in: [ComplaintStatus.PENDING, ComplaintStatus.IN_REVIEW] } } }),
     prisma.notification.count({ where: { isRead: false } }),
+    prisma.enrollment.count(),
+    prisma.enrollment.count({ where: { createdAt: { gte: today } } }),
     prisma.attendanceSession.findMany({ include: { course: { select: { courseCode: true, courseTitle: true } }, _count: { select: { records: true } } }, orderBy: { date: "desc" }, take: 8 }),
   ]);
-  return { students, lecturers, courses, sessions, openComplaints: complaints, unreadNotifications, recentSessions };
+  return { students, lecturers, courses, sessions, openComplaints: complaints, unreadNotifications, totalEnrollments, registeredToday, recentSessions };
 }
 
 export async function listAdminUsers(search: string, role: UserRole | undefined, page: number, limit: number) {
@@ -43,15 +47,22 @@ export function listAdminAttendanceSessions(filters: { courseId?: string; lectur
   });
 }
 
+export async function getAdminCourseAttendance(courseId: string) {
+  const course = await prisma.course.findUnique({ where: { id: courseId }, select: { id: true, courseCode: true, courseTitle: true, enrollments: { select: { student: { select: { id: true, fullName: true, matricNumber: true } } } } } });
+  if (!course) throw new Error("Course not found.");
+  const rows = await Promise.all(course.enrollments.map(async ({ student }) => ({ courseCode: course.courseCode, courseTitle: course.courseTitle, studentName: student.fullName, matricNumber: student.matricNumber, ...(await calculateEligibility(student.id, course.id)) })));
+  return rows;
+}
+
 export async function listAdminCourses(search: string) {
   return prisma.course.findMany({ where: search ? { OR: [{ courseCode: { contains: search, mode: "insensitive" } }, { courseTitle: { contains: search, mode: "insensitive" } }] } : undefined, include: { _count: { select: { enrollments: true, attendanceSessions: true, lecturerAssignments: true } }, lecturerAssignments: { where: { active: true }, include: { lecturer: { select: { id: true, fullName: true, email: true } } } } }, orderBy: { courseCode: "asc" } });
 }
 
-export async function createAdminCourse(input: { courseCode: string; courseTitle: string; description?: string; unit?: number; semester?: string; academicSession?: string }) {
+export async function createAdminCourse(input: { courseCode: string; courseTitle: string; description?: string; unit?: number; department?: string; level?: string; semester?: string; academicSession?: string }) {
   return prisma.course.create({ data: input });
 }
 
-export async function updateAdminCourse(courseId: string, input: Partial<{ courseCode: string; courseTitle: string; description: string; unit: number; semester: string; academicSession: string }>) {
+export async function updateAdminCourse(courseId: string, input: Partial<{ courseCode: string; courseTitle: string; description: string; unit: number; department: string; level: string; semester: string; academicSession: string }>) {
   return prisma.course.update({ where: { id: courseId }, data: input });
 }
 

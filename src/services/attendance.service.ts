@@ -20,6 +20,7 @@ export type CourseAttendanceSummary = {
   threshold: number;
   lowAttendance: boolean;
   status: "Good standing" | "At risk" | "No data";
+  eligibilityStatus: "GOOD TO GO" | "INELIGIBLE" | "NO DATA";
 };
 
 export type RecentAttendanceItem = {
@@ -63,9 +64,31 @@ export type StudentDashboardData = {
   }>;
 };
 
-const ATTENDANCE_THRESHOLD = 75;
+const ATTENDANCE_THRESHOLD = 50;
 
 export const attendanceThreshold = ATTENDANCE_THRESHOLD;
+
+export type EligibilityResult = {
+  studentId: string;
+  courseId: string;
+  totalSessionsHeld: number;
+  sessionsAttended: number;
+  attendancePercentage: number | null;
+  eligible: boolean;
+  status: "GOOD TO GO" | "INELIGIBLE" | "NO DATA";
+};
+
+export async function calculateEligibility(studentId: string, courseId: string): Promise<EligibilityResult> {
+  const sessions = await prisma.attendanceSession.findMany({
+    where: { courseId },
+    include: { records: { where: { studentId }, select: { status: true } } },
+  });
+  const totalSessionsHeld = sessions.length;
+  const sessionsAttended = sessions.filter((session) => { const status = session.records[0]?.status; return status === AttendanceStatus.PRESENT || status === AttendanceStatus.LATE; }).length;
+  const attendancePercentage = totalSessionsHeld === 0 ? null : Number(((sessionsAttended / totalSessionsHeld) * 100).toFixed(1));
+  const eligible = attendancePercentage !== null && attendancePercentage >= 50;
+  return { studentId, courseId, totalSessionsHeld, sessionsAttended, attendancePercentage, eligible, status: attendancePercentage === null ? "NO DATA" : eligible ? "GOOD TO GO" : "INELIGIBLE" };
+}
 
 export type AttendanceCounts = Pick<CourseAttendanceSummary, "present" | "absent" | "late" | "excused">;
 
@@ -85,7 +108,7 @@ export function toPercentage(attended: number, eligibleSessions: number): number
   return Number(((attended / eligibleSessions) * 100).toFixed(1));
 }
 
-export function aggregateSessionStatuses(sessions: Array<{ records: Array<{ status: AttendanceStatus }> }>): Omit<CourseAttendanceSummary, "courseId" | "courseCode" | "courseTitle" | "threshold" | "lowAttendance" | "status"> {
+export function aggregateSessionStatuses(sessions: Array<{ records: Array<{ status: AttendanceStatus }> }>): Omit<CourseAttendanceSummary, "courseId" | "courseCode" | "courseTitle" | "threshold" | "lowAttendance" | "status" | "eligibilityStatus"> {
   const summary = {
     totalSessions: sessions.length,
     present: 0,
@@ -167,6 +190,7 @@ export async function getStudentCourseAttendanceSummary(
     threshold: ATTENDANCE_THRESHOLD,
     lowAttendance,
     status: attendancePercentage === null ? "No data" : attendancePercentage >= ATTENDANCE_THRESHOLD ? "Good standing" : "At risk",
+    eligibilityStatus: attendancePercentage === null ? "NO DATA" : attendancePercentage >= 50 ? "GOOD TO GO" : "INELIGIBLE",
     ...baseSummary,
   };
 }
@@ -305,6 +329,7 @@ export async function getStudentDashboardData(userId: string): Promise<StudentDa
       threshold: ATTENDANCE_THRESHOLD,
       lowAttendance: attendancePercentage !== null && attendancePercentage < ATTENDANCE_THRESHOLD,
       status: attendancePercentage === null ? "No data" : attendancePercentage >= ATTENDANCE_THRESHOLD ? "Good standing" : "At risk",
+      eligibilityStatus: attendancePercentage === null ? "NO DATA" : attendancePercentage >= 50 ? "GOOD TO GO" : "INELIGIBLE",
       ...baseSummary,
     } satisfies CourseAttendanceSummary;
   });
