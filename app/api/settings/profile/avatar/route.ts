@@ -12,7 +12,8 @@ export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
 
-  const formData = await request.formData();
+  let formData: FormData;
+  try { formData = await request.formData(); } catch { return NextResponse.json({ success: false, error: "Invalid upload request." }, { status: 400 }); }
   const file = formData.get("file");
   if (!(file instanceof File) || !allowedTypes.has(file.type) || file.size === 0 || file.size > MAX_FILE_SIZE) {
     return NextResponse.json({ success: false, error: "Choose a JPG, PNG, or WebP image smaller than 5 MB." }, { status: 400 });
@@ -26,15 +27,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "The uploaded file is not a valid image." }, { status: 400 });
   }
 
-  const extension = file.type.split("/")[1].replace("jpeg", "jpg");
-  const key = `avatars/${session.user.id}/${crypto.randomUUID()}.${extension}`;
-  const storage = getObjectStorage();
-  const stored = await storage.put({ key, body: new Uint8Array(await file.arrayBuffer()), contentType: file.type });
-  const previous = await prisma.user.findUnique({ where: { id: session.user.id }, select: { avatarUrl: true } });
-  const data = await prisma.user.update({ where: { id: session.user.id }, data: { avatarUrl: stored.url }, select: { avatarUrl: true } });
-  if (previous?.avatarUrl) {
-    const previousKey = previous.avatarUrl.includes("/avatars/") ? `avatars/${previous.avatarUrl.split("/avatars/")[1]}` : null;
-    if (previousKey) await storage.delete(previousKey);
-  }
-  return NextResponse.json({ success: true, data }, { status: 200 });
+  try {
+    const extension = file.type.split("/")[1].replace("jpeg", "jpg");
+    const key = `avatars/${session.user.id}/${crypto.randomUUID()}.${extension}`;
+    const storage = getObjectStorage();
+    const stored = await storage.put({ key, body: new Uint8Array(await file.arrayBuffer()), contentType: file.type });
+    const previous = await prisma.user.findUnique({ where: { id: session.user.id }, select: { avatarUrl: true } });
+    const data = await prisma.user.update({ where: { id: session.user.id }, data: { avatarUrl: stored.url }, select: { avatarUrl: true } });
+    if (previous?.avatarUrl) {
+      const previousKey = previous.avatarUrl.includes("/avatars/") ? `avatars/${previous.avatarUrl.split("/avatars/")[1]}` : null;
+      if (previousKey) await storage.delete(previousKey);
+    }
+    return NextResponse.json({ success: true, data }, { status: 200 });
+  } catch { return NextResponse.json({ success: false, error: "Unable to store your profile image." }, { status: 503 }); }
 }

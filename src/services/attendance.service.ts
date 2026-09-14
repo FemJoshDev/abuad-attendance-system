@@ -95,7 +95,7 @@ export type AttendanceCounts = Pick<CourseAttendanceSummary, "present" | "absent
 export function calculateAttendance(counts: AttendanceCounts) {
   const attended = counts.present + counts.late;
   const totalSessions = attended + counts.absent + counts.excused;
-  const eligibleSessions = Math.max(0, totalSessions - counts.excused);
+  const eligibleSessions = totalSessions;
   const attendancePercentage = toPercentage(attended, eligibleSessions);
   return { ...counts, totalSessions, attended, eligibleSessions, attendancePercentage, threshold: ATTENDANCE_THRESHOLD, lowAttendance: attendancePercentage !== null && attendancePercentage < ATTENDANCE_THRESHOLD };
 }
@@ -144,7 +144,7 @@ export function aggregateSessionStatuses(sessions: Array<{ records: Array<{ stat
   }
 
   summary.attended = summary.present + summary.late;
-  summary.eligibleSessions = Math.max(0, summary.totalSessions - summary.excused);
+  summary.eligibleSessions = summary.totalSessions;
   summary.attendancePercentage = toPercentage(summary.attended, summary.eligibleSessions);
 
   return summary;
@@ -350,7 +350,7 @@ export async function getStudentDashboardData(userId: string): Promise<StudentDa
     ...overallBase,
     attendancePercentage: toPercentage(
       overallBase.attendedClasses,
-      Math.max(0, overallBase.totalClasses - overallBase.excused),
+      overallBase.totalClasses,
     ),
     threshold: ATTENDANCE_THRESHOLD,
   };

@@ -2,6 +2,7 @@ import { AttendanceStatus, type UserRole } from "@prisma/client";
 
 import { prisma } from "@/src/lib/prisma";
 import { toPercentage } from "@/src/services/attendance.service";
+import { attendanceRadiusMeters, validateCoordinates } from "@/src/lib/attendance-location";
 
 export async function canManageCourse(userId: string, role: UserRole, courseId: string) {
   if (role !== "LECTURER") return false;
@@ -12,7 +13,7 @@ export async function canManageCourse(userId: string, role: UserRole, courseId: 
 export async function getLecturerCourses(userId: string, role: UserRole) {
   if (role !== "LECTURER") return [];
   const courses = await prisma.course.findMany({
-    where: { lecturerAssignments: { some: { lecturerId: userId, active: true, lecturer: { isActive: true, role: "LECTURER" } } } },
+    where: { isActive: true, lecturerAssignments: { some: { lecturerId: userId, active: true, lecturer: { isActive: true, role: "LECTURER" } } } },
     include: { _count: { select: { enrollments: true, attendanceSessions: true } }, attendanceSessions: { orderBy: { date: "desc" }, take: 1 } },
     orderBy: { courseCode: "asc" },
   });
@@ -30,12 +31,13 @@ export async function getLecturerCourses(userId: string, role: UserRole) {
   }));
 }
 
-export async function createLecturerSession(userId: string, role: UserRole, courseId: string, input: { date: Date; startTime?: Date; endTime?: Date }) {
+export async function createLecturerSession(userId: string, role: UserRole, courseId: string, input: { date: Date; startTime?: Date; endTime?: Date; latitude: number; longitude: number; accuracy: number }) {
   if (!(await canManageCourse(userId, role, courseId))) throw new Error("Course access denied.");
+  if (!validateCoordinates(input.latitude, input.longitude, input.accuracy)) throw new Error("A reliable lecturer location is required to open attendance.");
   const conflict = await prisma.attendanceSession.findFirst({ where: { courseId, isOpen: true } });
   if (conflict) throw new Error("An attendance session is already open for this course.");
-  const session = await prisma.attendanceSession.create({ data: { courseId, date: input.date, startTime: input.startTime, endTime: input.endTime, createdById: userId, isOpen: true }, include: { course: { select: { courseCode: true, courseTitle: true, enrollments: { select: { studentId: true } } } } } });
-  await prisma.notification.createMany({ data: session.course.enrollments.map((enrollment) => ({ userId: enrollment.studentId, title: "Attendance Opened", message: `Lecturer opened attendance for ${session.course.courseCode} - ${session.course.courseTitle}. Click here to mark attendance.`, type: "ATTENDANCE" as const })) });
+  const session = await prisma.attendanceSession.create({ data: { courseId, date: input.date, startTime: input.startTime, endTime: input.endTime, createdById: userId, isOpen: true, latitude: input.latitude, longitude: input.longitude, locationAccuracy: input.accuracy, allowedRadius: attendanceRadiusMeters }, include: { course: { select: { courseCode: true, courseTitle: true, enrollments: { select: { studentId: true } } } } } });
+  await prisma.notification.createMany({ data: session.course.enrollments.map((enrollment) => ({ userId: enrollment.studentId, attendanceSessionId: session.id, title: "Attendance Open", message: `${session.course.courseCode} · ${session.course.courseTitle}: attendance is currently open.`, type: "ATTENDANCE" as const })), skipDuplicates: true });
   return session;
 }
 
@@ -72,12 +74,15 @@ export async function reopenLecturerSession(userId: string, role: UserRole, sess
 export async function getLecturerDashboard(userId: string, role: UserRole) {
   const courses = await getLecturerCourses(userId, role);
   const courseIds = courses.map((course) => course.id);
+  if (courseIds.length === 0) return { assignedCourses: 0, attendanceSessions: 0, studentAttendancePercentage: 0, courses };
   const [sessions, records] = await Promise.all([
     prisma.attendanceSession.count({ where: { courseId: { in: courseIds } } }),
     prisma.attendanceRecord.groupBy({ by: ["status"], where: { session: { courseId: { in: courseIds } } }, _count: { _all: true } }),
   ]);
   const present = records.find((record) => record.status === "PRESENT")?._count._all ?? 0;
   const late = records.find((record) => record.status === "LATE")?._count._all ?? 0;
-  const eligible = records.filter((record) => record.status !== "EXCUSED").reduce((total, record) => total + record._count._all, 0);
-  return { assignedCourses: courses.length, attendanceSessions: sessions, studentAttendancePercentage: toPercentage(present + late, eligible), courses };
+  const excused = records.find((record) => record.status === "EXCUSED")?._count._all ?? 0;
+  const possibleAttendance = courses.reduce((total, course) => total + course.sessionCount * course.studentCount, 0);
+  const eligible = Math.max(0, possibleAttendance - excused);
+  return { assignedCourses: courses.length, attendanceSessions: sessions, studentAttendancePercentage: toPercentage(present + late, eligible) ?? 0, courses };
 }

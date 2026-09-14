@@ -24,6 +24,7 @@ export async function createNotification(input: {
   title: string;
   message: string;
   type?: NotificationType;
+  attendanceSessionId?: string;
 }) {
   return prisma.notification.create({
     data: {
@@ -31,6 +32,7 @@ export async function createNotification(input: {
       title: input.title,
       message: input.message,
       type: input.type ?? NotificationType.SYSTEM,
+      attendanceSessionId: input.attendanceSessionId,
     },
   });
 }

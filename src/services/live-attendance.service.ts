@@ -2,6 +2,7 @@ import { AttendanceStatus } from "@prisma/client";
 
 import { prisma } from "@/src/lib/prisma";
 import { canManageCourse } from "@/src/services/lecturer.service";
+import { assertWithinAttendanceRadius } from "@/src/lib/attendance-location";
 
 export async function getStudentOpenSessions(studentId: string) {
   return prisma.attendanceSession.findMany({
@@ -11,7 +12,7 @@ export async function getStudentOpenSessions(studentId: string) {
   });
 }
 
-export async function markStudentPresent(studentId: string, sessionId: string) {
+export async function markStudentPresent(studentId: string, sessionId: string, location: { latitude: number; longitude: number; accuracy: number }) {
   const session = await prisma.attendanceSession.findUnique({ where: { id: sessionId }, include: { course: true } });
   if (!session || !session.isOpen) throw new Error("Attendance session is closed.");
   const enrollment = await prisma.enrollment.findFirst({ where: { studentId, courseId: session.courseId } });
@@ -19,6 +20,7 @@ export async function markStudentPresent(studentId: string, sessionId: string) {
   const now = new Date();
   if (session.startTime && now < session.startTime) throw new Error("Attendance has not opened yet.");
   if (session.endTime && now > session.endTime) throw new Error("Attendance has closed for this time window.");
+  assertWithinAttendanceRadius({ lecturerLatitude: session.latitude, lecturerLongitude: session.longitude, studentLatitude: location.latitude, studentLongitude: location.longitude, studentAccuracy: location.accuracy, allowedRadius: session.allowedRadius });
   return prisma.attendanceRecord.upsert({ where: { sessionId_studentId: { sessionId, studentId } }, update: {}, create: { sessionId, studentId, status: AttendanceStatus.PRESENT } });
 }
 

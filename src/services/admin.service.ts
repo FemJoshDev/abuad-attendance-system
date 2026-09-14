@@ -16,7 +16,7 @@ export async function getAdminDashboard() {
     prisma.user.count({ where: { role: UserRole.LECTURER } }),
     prisma.course.count(),
     prisma.attendanceSession.count(),
-    prisma.complaint.count({ where: { status: { in: [ComplaintStatus.PENDING, ComplaintStatus.IN_REVIEW] } } }),
+    prisma.complaint.count({ where: { destination: "ADMIN", status: { in: [ComplaintStatus.PENDING, ComplaintStatus.ASSIGNED_TO_LECTURER, ComplaintStatus.RETURNED_FOR_ADMIN_REVIEW, ComplaintStatus.IN_REVIEW] } } }),
     prisma.notification.count({ where: { isRead: false } }),
     prisma.enrollment.count(),
     prisma.enrollment.count({ where: { createdAt: { gte: today } } }),
@@ -41,7 +41,7 @@ export function setUserActiveState(userId: string, isActive: boolean) {
 export function listAdminAttendanceSessions(filters: { courseId?: string; lecturerId?: string; date?: string }) {
   return prisma.attendanceSession.findMany({
     where: { ...(filters.courseId ? { courseId: filters.courseId } : {}), ...(filters.lecturerId ? { createdById: filters.lecturerId } : {}), ...(filters.date ? { date: new Date(`${filters.date}T00:00:00.000Z`) } : {}) },
-    include: { course: { select: { courseCode: true, courseTitle: true } }, createdBy: { select: { fullName: true, email: true } }, records: { include: { student: { select: { fullName: true, matricNumber: true } } }, orderBy: { student: { fullName: "asc" } } } },
+    include: { course: { select: { id: true, courseCode: true, courseTitle: true } }, createdBy: { select: { fullName: true, email: true } }, records: { include: { student: { select: { fullName: true, matricNumber: true } } }, orderBy: { student: { fullName: "asc" } } } },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     take: 500,
   });
@@ -58,11 +58,11 @@ export async function listAdminCourses(search: string) {
   return prisma.course.findMany({ where: search ? { OR: [{ courseCode: { contains: search, mode: "insensitive" } }, { courseTitle: { contains: search, mode: "insensitive" } }] } : undefined, include: { _count: { select: { enrollments: true, attendanceSessions: true, lecturerAssignments: true } }, lecturerAssignments: { where: { active: true }, include: { lecturer: { select: { id: true, fullName: true, email: true } } } } }, orderBy: { courseCode: "asc" } });
 }
 
-export async function createAdminCourse(input: { courseCode: string; courseTitle: string; description?: string; unit?: number; department?: string; level?: string; semester?: string; academicSession?: string }) {
+export async function createAdminCourse(input: { courseCode: string; courseTitle: string; description?: string; unit?: number; department?: string; level?: string; semester?: string; academicSession?: string; isActive?: boolean }) {
   return prisma.course.create({ data: input });
 }
 
-export async function updateAdminCourse(courseId: string, input: Partial<{ courseCode: string; courseTitle: string; description: string; unit: number; department: string; level: string; semester: string; academicSession: string }>) {
+export async function updateAdminCourse(courseId: string, input: Partial<{ courseCode: string; courseTitle: string; description: string; unit: number; department: string; level: string; semester: string; academicSession: string; isActive: boolean }>) {
   return prisma.course.update({ where: { id: courseId }, data: input });
 }
 
@@ -78,6 +78,13 @@ export async function assignLecturer(courseId: string, lecturerId: string, acade
     : prisma.lecturerCourseAssignment.create({ data: { lecturerId, courseId, academicSession, semester } });
 }
 
+export async function removeLecturerAssignment(courseId: string, lecturerId: string) {
+  return prisma.lecturerCourseAssignment.updateMany({
+    where: { courseId, lecturerId, active: true },
+    data: { active: false },
+  });
+}
+
 export async function enrollStudent(courseId: string, studentId: string, academicSession?: string, semester?: string) {
   const [course, student] = await Promise.all([
     prisma.course.findUnique({ where: { id: courseId }, select: { id: true } }),
@@ -89,5 +96,5 @@ export async function enrollStudent(courseId: string, studentId: string, academi
 }
 
 export async function listAdminComplaints(status?: ComplaintStatus) {
-  return prisma.complaint.findMany({ where: status ? { status } : undefined, include: { user: { select: { id: true, fullName: true, email: true, matricNumber: true } }, assignedLecturer: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: "desc" }, take: 100 });
+  return prisma.complaint.findMany({ where: { destination: "ADMIN", ...(status ? { status } : {}) }, include: { user: { select: { id: true, fullName: true, email: true, matricNumber: true } }, assignedLecturer: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: "desc" }, take: 100 });
 }

@@ -9,6 +9,10 @@ function csvCell(value: string | number | null) {
   return `"${text.replaceAll('"', '""')}"`;
 }
 
+function filePart(value: string) {
+  return value.trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "") || "course";
+}
+
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
@@ -20,7 +24,8 @@ export async function GET(request: Request) {
     const rows = await getAdminCourseAttendance(courseId);
     const header = ["courseCode", "courseTitle", "studentName", "matricNumber", "totalSessionsHeld", "sessionsAttended", "attendancePercentage", "qualificationStatus"].map(csvCell).join(",");
     const body = rows.map((row) => [row.courseCode, row.courseTitle, row.studentName, row.matricNumber, row.totalSessionsHeld, row.sessionsAttended, row.attendancePercentage, row.status].map(csvCell).join(","));
-    return new NextResponse([header, ...body].join("\n"), { status: 200, headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename=${rows[0]?.courseCode ?? "course"}-attendance.csv`, "Cache-Control": "no-store" } });
+    const courseName = rows[0] ? `${rows[0].courseCode}-${rows[0].courseTitle}` : "course";
+    return new NextResponse([header, ...body].join("\n"), { status: 200, headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename=${filePart(courseName)}-Attendance.csv`, "Cache-Control": "no-store" } });
   }
   const sessions = await listAdminAttendanceSessions({ courseId, lecturerId, date: params.get("date") || undefined });
   if (params.get("format") !== "csv") return NextResponse.json({ success: true, data: sessions });

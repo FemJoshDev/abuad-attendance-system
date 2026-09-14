@@ -1,4 +1,4 @@
-import { ComplaintCategory, ComplaintPriority } from "@prisma/client";
+import { ComplaintCategory, ComplaintDestination, ComplaintPriority } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 
@@ -41,18 +41,29 @@ export async function POST(request: Request) {
   const subject = typeof body.subject === "string" ? body.subject.trim() : "";
   const description = typeof body.description === "string" ? body.description.trim() : "";
   const courseId = typeof body.courseId === "string" && body.courseId ? body.courseId : undefined;
-  if (!subject || subject.length > 200 || !description || description.length > 5000 || !isEnumValue(body.category, ComplaintCategory) || !isEnumValue(body.priority, ComplaintPriority)) {
+  if (!subject || subject.length > 200 || !description || description.length > 5000 || !isEnumValue(body.category, ComplaintCategory) || !isEnumValue(body.priority, ComplaintPriority) || !isEnumValue(body.destination, ComplaintDestination)) {
     return NextResponse.json({ success: false, error: "Provide a valid subject, category, priority, and description." }, { status: 400 });
   }
 
   try {
+    const destination = body.destination;
+    let assignedLecturerId: string | undefined;
     if (courseId) {
       const enrollment = await prisma.enrollment.findFirst({ where: { studentId: session.user.id, courseId } });
       if (!enrollment) return NextResponse.json({ success: false, error: "You can only select a course you are enrolled in." }, { status: 403 });
     }
-    const data = await createComplaint(session.user.id, { subject, description, courseId, category: body.category, priority: body.priority });
-    const admins = await prisma.user.findMany({ where: { role: "ADMIN", isActive: true }, select: { id: true } });
-    await Promise.all(admins.map((admin) => createNotification({ userId: admin.id, title: "New student complaint", message: `${subject} requires administrative review.`, type: "SYSTEM" })));
+    if (destination === ComplaintDestination.LECTURER) {
+      if (!courseId) return NextResponse.json({ success: false, error: "Select one of your courses to route a complaint to its lecturer." }, { status: 400 });
+      const assignment = await prisma.lecturerCourseAssignment.findFirst({ where: { courseId, active: true, lecturer: { role: "LECTURER", isActive: true } }, select: { lecturerId: true } });
+      if (!assignment) return NextResponse.json({ success: false, error: "No active lecturer is assigned to this course." }, { status: 400 });
+      assignedLecturerId = assignment.lecturerId;
+    }
+    const data = await createComplaint(session.user.id, { subject, description, courseId, category: body.category, priority: body.priority, destination, assignedLecturerId });
+    if (assignedLecturerId) await createNotification({ userId: assignedLecturerId, title: "Complaint assigned", message: `A student complaint for review: ${subject}.`, type: "SYSTEM" });
+    else {
+      const admins = await prisma.user.findMany({ where: { role: "ADMIN", isActive: true }, select: { id: true } });
+      await Promise.all(admins.map((admin) => createNotification({ userId: admin.id, title: "New student complaint", message: `${subject} requires administrative review.`, type: "SYSTEM" })));
+    }
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch {
     return NextResponse.json({ success: false, error: "Unable to submit complaint." }, { status: 500 });

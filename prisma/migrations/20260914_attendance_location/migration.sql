@@ -1,0 +1,5 @@
+ALTER TABLE "AttendanceSession"
+  ADD COLUMN "latitude" DOUBLE PRECISION,
+  ADD COLUMN "longitude" DOUBLE PRECISION,
+  ADD COLUMN "locationAccuracy" DOUBLE PRECISION,
+  ADD COLUMN "allowedRadius" DOUBLE PRECISION;

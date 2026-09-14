@@ -24,7 +24,6 @@ async function main() {
       fullName: "Joshua Ojo",
       matricNumber: "ABUAD/20/4521",
       role: UserRole.STUDENT,
-      passwordHash: await hashPassword(studentPassword),
     },
     create: {
       fullName: "Joshua Ojo",
@@ -42,7 +41,6 @@ async function main() {
       matricNumber: null,
       role: UserRole.LECTURER,
       isActive: true,
-      passwordHash: await hashPassword(lecturerPassword),
     },
     create: {
       fullName: "Dr. O. Williams",
@@ -60,7 +58,6 @@ async function main() {
       fullName: "System Administrator",
       matricNumber: null,
       role: UserRole.ADMIN,
-      passwordHash: await hashPassword(adminPassword),
     },
     create: {
       fullName: "System Administrator",
@@ -122,6 +119,7 @@ async function main() {
       unit: 5,
       semester: "First Semester",
       academicSession: "2024/2025",
+      isActive: true,
     },
     {
       courseCode: "MBBS 503",
@@ -130,6 +128,7 @@ async function main() {
       unit: 5,
       semester: "First Semester",
       academicSession: "2024/2025",
+      isActive: true,
     },
     {
       courseCode: "MBBS 505",
@@ -138,6 +137,7 @@ async function main() {
       unit: 4,
       semester: "First Semester",
       academicSession: "2024/2025",
+      isActive: true,
     },
     {
       courseCode: "MBBS 504",
@@ -146,6 +146,7 @@ async function main() {
       unit: 4,
       semester: "Second Semester",
       academicSession: "2024/2025",
+      isActive: true,
     },
   ];
 
@@ -229,6 +230,9 @@ async function main() {
           courseId: course.id,
           date: new Date(`${rawDate}T00:00:00.000Z`),
           startTime: new Date(`${rawDate}T09:00:00.000Z`),
+          endTime: new Date(`${rawDate}T17:00:00.000Z`),
+          isOpen: false,
+          closedAt: new Date(`${rawDate}T17:00:00.000Z`),
         },
       });
 

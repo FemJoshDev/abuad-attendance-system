@@ -1,2 +1,2 @@
-export const DEFAULT_STUDENT_PASSWORD = "student123!";
-export const DEFAULT_LECTURER_PASSWORD = "lecturerABUADCMHS!";
+export const DEFAULT_STUDENT_PASSWORD = "Student123!";
+export const DEFAULT_LECTURER_PASSWORD = "ABUADCMHS123!";

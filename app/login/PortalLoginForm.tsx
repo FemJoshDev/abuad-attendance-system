@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 type PortalRole = "STUDENT" | "LECTURER" | "ADMIN";
 
 const portalConfig: Record<PortalRole, { title: string; label: string; placeholder: string; destination: string }> = {
-  STUDENT: { title: "Student Portal", label: "Matriculation Number", placeholder: "ABUAD/20/4521", destination: "/student/dashboard" },
+  STUDENT: { title: "Student Portal", label: "Matriculation Number (not email)", placeholder: "ABUAD/20/4521", destination: "/student/dashboard" },
   LECTURER: { title: "Lecturer Portal", label: "ABUAD Email", placeholder: "lecturer@abuad.edu.ng", destination: "/lecturer/dashboard" },
   ADMIN: { title: "Admin Portal", label: "Admin Email", placeholder: "admin@abuad.edu.ng", destination: "/admin/dashboard" },
 };

@@ -94,6 +94,17 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role as UserRole;
       }
 
+      if (token.id) {
+        const currentUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { fullName: true, email: true, role: true, isActive: true },
+        });
+        if (!currentUser || !currentUser.isActive) return {};
+        token.name = currentUser.fullName;
+        token.email = currentUser.email;
+        token.role = currentUser.role;
+      }
+
       return token;
     },
     async session({ session, token }: { session: Session; token: JWT }) {

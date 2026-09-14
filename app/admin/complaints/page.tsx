@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-type Complaint = { id: string; subject: string; priority: string; description: string; status: "PENDING" | "ASSIGNED_TO_LECTURER" | "IN_REVIEW" | "RESOLVED" | "CLOSED"; lecturerResponse: string | null; createdAt: string; user: { fullName: string; email: string; matricNumber: string | null }; assignedLecturer: { id: string; fullName: string } | null };
+type Complaint = { id: string; subject: string; priority: string; description: string; status: "PENDING" | "ASSIGNED_TO_LECTURER" | "RETURNED_FOR_ADMIN_REVIEW" | "IN_REVIEW" | "RESOLVED" | "CLOSED"; lecturerResponse: string | null; createdAt: string; user: { fullName: string; email: string; matricNumber: string | null }; assignedLecturer: { id: string; fullName: string } | null };
 type Lecturer = { id: string; fullName: string; email: string };
-const statuses = ["ALL", "PENDING", "ASSIGNED_TO_LECTURER", "IN_REVIEW", "RESOLVED", "CLOSED"] as const;
+const statuses = ["ALL", "PENDING", "ASSIGNED_TO_LECTURER", "RETURNED_FOR_ADMIN_REVIEW", "IN_REVIEW", "RESOLVED", "CLOSED"] as const;
 
 export default function AdminComplaintsPage() {
   const [items, setItems] = useState<Complaint[]>([]);

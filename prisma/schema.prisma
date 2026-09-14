@@ -45,9 +45,15 @@ enum ComplaintPriority {
 enum ComplaintStatus {
   PENDING
   ASSIGNED_TO_LECTURER
+  RETURNED_FOR_ADMIN_REVIEW
   IN_REVIEW
   RESOLVED
   CLOSED
+}
+
+enum ComplaintDestination {
+  ADMIN
+  LECTURER
 }
 
 model User {
@@ -105,6 +111,7 @@ model Course {
   level           String?
   semester        String?
   academicSession String?
+  isActive        Boolean           @default(true)
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -163,6 +170,10 @@ model AttendanceSession {
   reopenedAt DateTime?
   createdById String?
   reopenedById String?
+  latitude Float?
+  longitude Float?
+  locationAccuracy Float?
+  allowedRadius Float?
   createdAt DateTime @default(now())
 
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
@@ -195,6 +206,7 @@ model Notification {
   title     String
   message   String
   type      NotificationType @default(SYSTEM)
+  attendanceSessionId String?
   isRead    Boolean         @default(false)
   createdAt DateTime        @default(now())
 
@@ -203,6 +215,7 @@ model Notification {
   @@index([userId, isRead])
   @@index([createdAt])
   @@index([type])
+  @@unique([userId, attendanceSessionId])
 }
 
 model Complaint {
@@ -214,10 +227,12 @@ model Complaint {
   courseId    String?
   priority    ComplaintPriority @default(MEDIUM)
   status      ComplaintStatus   @default(PENDING)
+  destination ComplaintDestination @default(ADMIN)
   assignedLecturerId String?
   assignedById String?
   lecturerResponse String?
   respondedAt DateTime?
+  resolvedAt DateTime?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
@@ -230,6 +245,7 @@ model Complaint {
   @@index([createdAt])
   @@index([priority])
   @@index([assignedLecturerId, status])
+  @@index([destination, status])
   @@index([courseId])
 }
 

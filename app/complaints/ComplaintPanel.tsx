@@ -2,82 +2,15 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
-type Complaint = {
-  id: string;
-  subject: string;
-  category: string;
-  priority: string;
-  description: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-};
+type Complaint = { id: string; subject: string; category: string; priority: string; description: string; destination: "ADMIN" | "LECTURER"; status: string; lecturerResponse: string | null; resolvedAt: string | null; course: { courseCode: string; courseTitle: string } | null; createdAt: string; updatedAt: string };
 type Course = { id: string; courseCode: string; courseTitle: string };
-
-const initialForm = { subject: "", category: "TECHNICAL_ISSUE", priority: "MEDIUM", description: "", courseId: "" };
-
-function EmptyState({ title, text }: { title: string; text: string }) {
-  return <div className="empty-state card"><span className="empty-icon">○</span><h3>{title}</h3><p>{text}</p></div>;
-}
+type ComplaintForm = { subject: string; category: string; priority: string; description: string; courseId: string; destination: "ADMIN" | "LECTURER" };
+const initialForm: ComplaintForm = { subject: "", category: "TECHNICAL_ISSUE", priority: "MEDIUM", description: "", courseId: "", destination: "ADMIN" };
 
 export default function ComplaintPanel() {
-  const [form, setForm] = useState(initialForm);
-  const [items, setItems] = useState<Complaint[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-
-  async function loadComplaints() {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/complaints");
-      if (!response.ok) throw new Error();
-      const payload = await response.json();
-      setItems(payload.data?.complaints ?? []);
-      setError("");
-    } catch {
-      setError("Unable to load your complaints right now.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    const load = window.setTimeout(loadComplaints, 0);
-    fetch("/api/courses").then((response) => response.ok ? response.json() : null).then((payload) => setCourses(payload?.data ?? [])).catch(() => undefined);
-    return () => window.clearTimeout(load);
-  }, []);
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setSuccess(false);
-    const subject = form.subject.trim();
-    const description = form.description.trim();
-    if (!subject || subject.length > 200 || !description || description.length > 5000) {
-      setError("Enter a subject and description within the allowed limits.");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const response = await fetch("/api/complaints", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, subject, description }),
-      });
-      if (!response.ok) throw new Error();
-      setForm(initialForm);
-      setSuccess(true);
-      await loadComplaints();
-    } catch {
-      setError("Unable to submit your complaint right now.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return <div className="prototype-content"><div className="page-intro"><p className="eyebrow">HELP DESK</p><h2>Complaints &amp; Support</h2><p>Report an issue, submit a complaint, or get help with the platform.</p></div><div className="support-layout"><section className="form-card card"><div className="card-heading"><h2>Submit a Complaint</h2><p>We usually respond within two working days.</p></div><form onSubmit={submit} noValidate><label htmlFor="subject">Complaint subject</label><input id="subject" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} placeholder="Briefly describe the issue" /><div className="form-row"><div><label htmlFor="category">Category</label><select id="category" value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option value="TECHNICAL_ISSUE">Technical Issue</option><option value="COURSE_ISSUE">Course Issue</option><option value="ACCOUNT_ISSUE">Account Issue</option><option value="CONTENT_ISSUE">Content Issue</option><option value="PAYMENT_ISSUE">Payment Issue</option><option value="OTHER">Other</option></select></div><div><label htmlFor="priority">Priority</label><select id="priority" value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option></select></div></div><label htmlFor="description">Description</label><textarea id="description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Tell us what happened and how we can help" rows={5} /><label htmlFor="attachment">Attachment <span className="optional">Optional</span></label><input id="attachment" type="file" /><p className="form-hint">PNG, JPG or PDF up to 10 MB</p>{error && <p className="form-error" role="alert">{error}</p>}{success && <p className="form-success" role="status">Complaint submitted successfully. Your support team has been notified.</p>}<button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Submitting..." : "Submit Complaint"}</button></form></section><section className="previous-card"><div className="card-heading"><h2>Previous Complaints</h2><p>Track your submitted requests.</p></div><div className="complaint-list">{loading ? <EmptyState title="Loading complaints..." text="Please wait while we load your complaints." /> : error && items.length === 0 ? <EmptyState title="Unable to load complaints" text={error} /> : items.length === 0 ? <EmptyState title="No complaints submitted yet" text="Your submitted requests will appear here." /> : items.map((complaint) => <article className="complaint-item card" key={complaint.id}><div><strong>{complaint.id}</strong><h3>{complaint.subject}</h3><p>{complaint.category} · Created {new Date(complaint.createdAt).toLocaleDateString()} · Updated {new Date(complaint.updatedAt).toLocaleDateString()}</p></div><span className={`status-badge complaint-${complaint.status.toLowerCase().replace("_", "-")}`}>{complaint.status}</span><small>{complaint.priority} priority</small></article>)}</div></section></div></div>;
+  const [form, setForm] = useState(initialForm); const [items, setItems] = useState<Complaint[]>([]); const [courses, setCourses] = useState<Course[]>([]); const [loading, setLoading] = useState(true); const [submitting, setSubmitting] = useState(false); const [error, setError] = useState(""); const [success, setSuccess] = useState("");
+  async function load() { const response = await fetch("/api/complaints"); if (!response.ok) throw new Error(); setItems((await response.json()).data?.complaints ?? []); }
+  useEffect(() => { const timer = window.setTimeout(() => { Promise.all([load(), fetch("/api/student/courses").then((response) => response.ok ? response.json() : null)]).then(([, coursePayload]) => setCourses((coursePayload?.data ?? []).filter((course: Course & { enrolled?: boolean }) => course.enrolled !== false))).catch(() => setError("Unable to load your complaints.")).finally(() => setLoading(false)); }, 0); return () => window.clearTimeout(timer); }, []);
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setError(""); setSuccess(""); const subject = form.subject.trim(); const description = form.description.trim(); if (!subject || !description) { setError("Enter a subject and description."); return; } if (form.destination === "LECTURER" && !form.courseId) { setError("Choose one of your courses so the complaint can be routed to its lecturer."); return; } setSubmitting(true); try { const response = await fetch("/api/complaints", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, subject, description }) }); const payload = await response.json().catch(() => null); if (!response.ok) throw new Error(payload?.error ?? "Unable to submit complaint."); setForm(initialForm); setSuccess("Complaint submitted. You will receive updates in Notifications."); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to submit complaint."); } finally { setSubmitting(false); } }
+  return <main className="dashboard-main"><div className="prototype-content"><div className="page-intro"><p className="eyebrow">HELP DESK</p><h2>Complaints &amp; Support</h2><p>Submit a concern to the relevant course lecturer or the administration, then track its response and resolution.</p></div><div className="support-layout"><section className="form-card card"><div className="card-heading"><h2>Submit a complaint</h2><p>Your request is saved securely and routed based on your selection.</p></div><form onSubmit={submit} noValidate><label>Who should handle this complaint?<select value={form.destination} onChange={(event) => setForm({ ...form, destination: event.target.value as "ADMIN" | "LECTURER" })}><option value="ADMIN">Admin</option><option value="LECTURER">Lecturer</option></select></label><label>Related course {form.destination === "ADMIN" && <span className="optional">Optional</span>}<select value={form.courseId} onChange={(event) => setForm({ ...form, courseId: event.target.value })}><option value="">{form.destination === "LECTURER" ? "Select an enrolled course" : "No course selected"}</option>{courses.map((course) => <option key={course.id} value={course.id}>{course.courseCode} · {course.courseTitle}</option>)}</select></label><label>Complaint subject<input value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} maxLength={200} placeholder="Briefly describe the issue" /></label><div className="form-row"><label>Category<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option value="TECHNICAL_ISSUE">Technical issue</option><option value="COURSE_ISSUE">Course issue</option><option value="ACCOUNT_ISSUE">Account issue</option><option value="CONTENT_ISSUE">Content issue</option><option value="PAYMENT_ISSUE">Payment issue</option><option value="OTHER">Other</option></select></label><label>Priority<select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option></select></label></div><label>Description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} maxLength={5000} rows={5} placeholder="Tell us what happened and how we can help" /></label>{error && <p className="form-error" role="alert">{error}</p>}{success && <p className="form-success" role="status">{success}</p>}<button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Submitting..." : "Submit complaint"}</button></form></section><section className="previous-card"><div className="card-heading"><h2>Your complaints</h2><p>Current status, response, and final resolution appear here.</p></div><div className="complaint-list">{loading ? <p className="empty-state card">Loading complaints...</p> : !items.length ? <p className="empty-state card">You haven&apos;t submitted any complaints yet.</p> : items.map((item) => <article className="complaint-item card" key={item.id}><div><strong>{item.course ? `${item.course.courseCode} · ` : ""}{item.subject}</strong><h3>{item.destination === "LECTURER" ? "Routed to lecturer" : "Routed to administration"}</h3><p>{item.category} · Submitted {new Date(item.createdAt).toLocaleDateString()}</p>{item.lecturerResponse && <p className="mt-3 text-sm"><b>Response:</b> {item.lecturerResponse}</p>}{item.resolvedAt && <p className="mt-2 text-sm"><b>Resolved:</b> {new Date(item.resolvedAt).toLocaleDateString()}</p>}</div><span className={`status-badge complaint-${item.status.toLowerCase().replaceAll("_", "-")}`}>{item.status}</span><small>{item.priority} priority · Updated {new Date(item.updatedAt).toLocaleDateString()}</small></article>)}</div></section></div></div></main>;
 }
