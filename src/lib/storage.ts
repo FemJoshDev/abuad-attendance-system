@@ -1,4 +1,5 @@
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { del, put } from "@vercel/blob";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -60,9 +61,21 @@ class S3ObjectStorage implements ObjectStorage {
   }
 }
 
+class VercelBlobObjectStorage implements ObjectStorage {
+  async put({ key, body, contentType }: { key: string; body: Uint8Array; contentType: string }): Promise<StoredObject> {
+    const blob = await put(key, Buffer.from(body), { access: "public", addRandomSuffix: false, contentType });
+    return { key: blob.pathname, url: blob.url };
+  }
+
+  async delete(key: string): Promise<void> {
+    await del(key);
+  }
+}
+
 export function getObjectStorage(): ObjectStorage {
   const provider = getProvider();
   if (provider === "local") return new LocalObjectStorage();
   if (provider === "s3") return new S3ObjectStorage();
+  if (provider === "blob") return new VercelBlobObjectStorage();
   throw new Error(`Unsupported STORAGE_PROVIDER: ${provider}`);
 }
