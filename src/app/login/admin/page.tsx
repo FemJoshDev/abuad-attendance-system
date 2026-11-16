@@ -1,8 +1,9 @@
 // src/app/admin/login/page.tsx
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -22,6 +23,7 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
+      const { signIn } = await import('next-auth/react');
       const result = await signIn('admin-credentials', {
         redirect: false,
         email,

@@ -1,8 +1,9 @@
 // src/app/lecturer/login/page.tsx
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -12,7 +13,7 @@ export default function LecturerLoginPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // Toggle state for viewing password
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -22,6 +23,7 @@ export default function LecturerLoginPage() {
     setLoading(true);
 
     try {
+      const { signIn } = await import('next-auth/react');
       const result = await signIn('lecturer-credentials', {
         redirect: false,
         email,
@@ -32,7 +34,6 @@ export default function LecturerLoginPage() {
         throw new Error('Invalid staff email or password.');
       }
 
-      // Replace the login page after successful authentication.
       router.replace('/lecturer/dashboard');
     } catch (err: any) {
       setError(err.message);
@@ -169,9 +170,6 @@ export default function LecturerLoginPage() {
           </form>
         </div>
       </section>
-
-      {/* Local footer completely removed so the global layout footer handles it cleanly */}
-
     </main>
   );
 }

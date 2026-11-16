@@ -1,8 +1,9 @@
 // src/app/login/page.tsx
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -10,34 +11,30 @@ import Link from 'next/link';
 export default function LoginPage() {
   const router = useRouter();
 
-  // 1. React Local State Management for form inputs and UI feedback
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // Toggle state for password visibility
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // 2. Handle form submission when the user clicks "Sign In"
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent default browser page refresh on form submit
-    setError(null);     // Clear any previous error messages
-    setIsLoading(true); // Turn on loading state to disable button / show feedback
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
 
     try {
-      // 3. Call NextAuth's client-side signIn function
+      const { signIn } = await import('next-auth/react');
       const result = await signIn('credentials', {
-        redirect: false, // Prevent automatic page reload so we can handle errors manually
+        redirect: false,
         email,
         password,
       });
 
-      // 4. Check if authentication failed on the backend
       const resError = (result as { error?: string } | null)?.error;
       if (resError) {
         setError('Invalid email or password.');
-        setIsLoading(false);    // Turn off loading state
+        setIsLoading(false);
       } else {
-        // Replace the login entry so Back does not return to the sign-in form.
         router.replace('/student/dashboard');
       }
     } catch (err) {
@@ -49,7 +46,7 @@ export default function LoginPage() {
   return (
     <main className="relative min-h-[85vh] flex flex-col justify-between px-3 sm:px-6 py-4 sm:py-6 overflow-x-hidden bg-stone-900 text-stone-100">
       
-      {/* 1. Background Image Overlay (Kept unique as requested) */}
+      {/* 1. Background Image Overlay */}
       <div className="absolute inset-0 z-0">
         <Image 
           src="/ABUAD%20ATTENDANCE.jpg" 
@@ -173,8 +170,6 @@ export default function LoginPage() {
           </form>
         </div>
       </section>
-
-      {/* Local footer completely removed so the global layout footer takes over cleanly */}
     </main>
   );
 }
