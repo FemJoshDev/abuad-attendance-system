@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { signOut } from 'next-auth/react';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -32,6 +31,12 @@ export default function AdminDashboard() {
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Safe client-only sign out handler to prevent build-time NextAuth URL crashes
+  const handleSignOut = async () => {
+    const { signOut } = await import('next-auth/react');
+    await signOut({ callbackUrl: '/admin/login' });
+  };
+
   const fetchData = async () => {
     try {
       const res = await fetch('/api/admin/dashboard');
@@ -44,7 +49,7 @@ export default function AdminDashboard() {
         setCoursesList(data.coursesList || []);
         setComplaints(data.complaints || []);
       } else if (res.status === 401 || res.status === 403) {
-        router.replace('/login/admin');
+        router.replace('/admin/login');
       }
     } catch (err) {
       console.error('Error fetching admin data', err);
@@ -177,7 +182,7 @@ export default function AdminDashboard() {
               <a href="#reports" onClick={() => setIsMobileMenuOpen(false)} className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">Attendance Reports</a>
               <a href="#complaints" onClick={() => setIsMobileMenuOpen(false)} className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">Complaints &amp; Fixes</a>
             </nav>
-            <button onClick={() => signOut({ callbackUrl: '/login/admin' })} className="mt-auto rounded-md border border-white/25 px-3 py-2.5 text-left text-sm hover:bg-white/10 cursor-pointer">
+            <button onClick={handleSignOut} className="mt-auto rounded-md border border-white/25 px-3 py-2.5 text-left text-sm hover:bg-white/10 cursor-pointer">
               Sign out
             </button>
           </aside>
@@ -197,7 +202,7 @@ export default function AdminDashboard() {
           <a href="#reports" className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">Attendance Reports</a>
           <a href="#complaints" className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">Complaints &amp; Fixes</a>
         </nav>
-        <button onClick={() => signOut({ callbackUrl: '/login/admin' })} className="mt-auto rounded-md border border-white/25 px-3 py-2.5 text-left text-sm hover:bg-white/10 cursor-pointer">
+        <button onClick={handleSignOut} className="mt-auto rounded-md border border-white/25 px-3 py-2.5 text-left text-sm hover:bg-white/10 cursor-pointer">
           Sign out
         </button>
       </aside>
@@ -213,7 +218,7 @@ export default function AdminDashboard() {
               <p className="text-sm font-semibold">{adminName}</p>
               <p className="text-xs text-[#746d68]">{adminEmail}</p>
             </div>
-            <button onClick={() => signOut({ callbackUrl: '/login/admin' })} className="rounded-md border border-[#ead9d5] px-3 py-2 text-xs font-semibold text-[#650019] cursor-pointer">
+            <button onClick={handleSignOut} className="rounded-md border border-[#ead9d5] px-3 py-2 text-xs font-semibold text-[#650019] cursor-pointer">
               Sign out
             </button>
           </div>
