@@ -23,6 +23,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      // Dynamic import prevents NextAuth from evaluating URLs during build prerendering
       const { signIn } = await import('next-auth/react');
       const result = await signIn('credentials', {
         redirect: false,
