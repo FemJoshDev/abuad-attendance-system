@@ -1,9 +1,10 @@
 // src/app/lecturer/dashboard/page.tsx
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { signOut } from 'next-auth/react';
 import Link from 'next/link';
 
 export default function LecturerDashboard() {
@@ -20,6 +21,11 @@ export default function LecturerDashboard() {
   const [checkedInCount, setCheckedInCount] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const handleSignOut = async () => {
+    const { signOut } = await import('next-auth/react');
+    await signOut({ callbackUrl: '/lecturer/login' });
+  };
 
   // Fetch the logged-in lecturer's live data on mount (and poll for live attendee counts)
   useEffect(() => {
@@ -44,7 +50,7 @@ export default function LecturerDashboard() {
             setSessionCode(null);
           }
         } else if (res.status === 401 || res.status === 403) {
-          signOut({ callbackUrl: '/login/lecturer' });
+          await handleSignOut();
         }
       } catch (err) {
         console.error('Failed to load lecturer dashboard', err);
@@ -177,7 +183,7 @@ export default function LecturerDashboard() {
             <nav className="space-y-2 text-sm">
               <Link href="#overview" onClick={() => setIsMobileMenuOpen(false)} className="block rounded-md bg-white/12 px-3 py-3 font-semibold">Dashboard</Link>
             </nav>
-            <button onClick={() => signOut({ callbackUrl: '/login/lecturer' })} className="mt-auto rounded-md border border-white/25 px-3 py-2.5 text-left text-sm text-white/85">Sign out</button>
+            <button onClick={handleSignOut} className="mt-auto rounded-md border border-white/25 px-3 py-2.5 text-left text-sm text-white/85 cursor-pointer">Sign out</button>
           </div>
         </div>
       )}
@@ -191,7 +197,7 @@ export default function LecturerDashboard() {
         <nav className="space-y-2 text-sm">
           <Link href="#overview" className="block rounded-md bg-white/12 px-3 py-3 font-semibold">Dashboard</Link>
         </nav>
-        <button onClick={() => signOut({ callbackUrl: '/login/lecturer' })} className="mt-auto rounded-md border border-white/25 px-3 py-2.5 text-left text-sm text-white/85">
+        <button onClick={handleSignOut} className="mt-auto rounded-md border border-white/25 px-3 py-2.5 text-left text-sm text-white/85 cursor-pointer">
           Sign out
         </button>
       </aside>
@@ -208,7 +214,7 @@ export default function LecturerDashboard() {
               <p className="text-sm font-semibold">{lecturerName}</p>
               <p className="mt-0.5 text-xs text-[#746d68]">{lecturerEmail}</p>
             </div>
-            <button onClick={() => signOut({ callbackUrl: '/login/lecturer' })} className="rounded-md border border-[#ead9d5] px-3 py-2 text-xs font-semibold text-[#650019]">
+            <button onClick={handleSignOut} className="rounded-md border border-[#ead9d5] px-3 py-2 text-xs font-semibold text-[#650019] cursor-pointer">
               Sign out
             </button>
           </div>
