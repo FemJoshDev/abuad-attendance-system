@@ -7,7 +7,6 @@ import { verifyPassword } from '@/lib/auth';
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    // 1. Student Credentials Provider (Default)
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
@@ -37,11 +36,7 @@ export const authOptions: NextAuthOptions = {
             throw new Error('Invalid email or password.');
           }
 
-          // Restrict default credentials provider strictly to students
-          if (user.role !== 'STUDENT') {
-            throw new Error('Invalid email or password.');
-          }
-
+          // Return user details including their database role (STUDENT, LECTURER, or ADMIN)
           return {
             id: user.id,
             email: user.email,
@@ -62,84 +57,6 @@ export const authOptions: NextAuthOptions = {
 
           throw new Error(error.message || 'An unexpected error occurred.');
         }
-      },
-    }),
-
-    // 2. Lecturer Credentials Provider
-    CredentialsProvider({
-      id: 'lecturer-credentials',
-      name: 'Lecturer Credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Invalid staff email or password.');
-        }
-
-        const user = await db.user.findUnique({
-          where: { email: credentials.email.trim().toLowerCase() },
-        });
-
-        if (!user?.passwordHash || user.role !== 'LECTURER') {
-          throw new Error('Invalid staff email or password.');
-        }
-
-        const isValidPassword = await verifyPassword(
-          credentials.password,
-          user.passwordHash
-        );
-
-        if (!isValidPassword) {
-          throw new Error('Invalid staff email or password.');
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.fullName,
-          role: user.role,
-        };
-      },
-    }),
-
-    // 3. Admin Credentials Provider
-    CredentialsProvider({
-      id: 'admin-credentials',
-      name: 'Admin Credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Invalid admin email or password.');
-        }
-
-        const user = await db.user.findUnique({
-          where: { email: credentials.email.trim().toLowerCase() },
-        });
-
-        if (!user?.passwordHash || user.role !== 'ADMIN') {
-          throw new Error('Invalid admin email or password.');
-        }
-
-        const isValidPassword = await verifyPassword(
-          credentials.password,
-          user.passwordHash
-        );
-
-        if (!isValidPassword) {
-          throw new Error('Invalid admin email or password.');
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.fullName,
-          role: user.role,
-        };
       },
     }),
   ],

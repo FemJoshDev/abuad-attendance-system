@@ -20,7 +20,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
     }
 
-    // Check if query params ask for exporting or editing attendance records
+    // Check query params for export
     const url = new URL(req.url);
     const exportSessionId = url.searchParams.get('exportSessionId');
 
@@ -61,6 +61,13 @@ export async function GET(req: Request) {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Fetch all students so instant client-side searching works smoothly
+    const studentsList = await db.user.findMany({
+      where: { role: 'STUDENT' },
+      select: { id: true, fullName: true, email: true, matricNumber: true, level: true },
+      orderBy: { fullName: 'asc' },
+    });
+
     const coursesList = await db.course.findMany({
       include: {
         lecturers: true, // Multi-lecturers support
@@ -86,6 +93,7 @@ export async function GET(req: Request) {
       adminEmail: admin.email,
       stats: { totalUsers, totalStudents, totalLecturers, activeCourses: activeCoursesCount },
       staffList,
+      studentsList,
       coursesList,
       complaints,
     });
@@ -130,9 +138,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: `Successfully provisioned ${role} account for ${fullName}` });
     }
 
-    // 2. ASSIGN / UPDATE / REMOVE LECTURERS FOR A COURSE (Supports Multiple Lecturers)
+    // 2. ASSIGN / UPDATE LECTURERS FOR A COURSE
     if (action === 'ASSIGN_LECTURERS') {
-      const { courseId, lecturerIds } = body; // lecturerIds is an array of IDs
+      const { courseId, lecturerIds } = body;
       if (!courseId || !Array.isArray(lecturerIds)) {
         return NextResponse.json({ error: 'Course ID and lecturer array required.' }, { status: 400 });
       }
@@ -141,7 +149,7 @@ export async function POST(req: Request) {
         where: { id: courseId },
         data: {
           lecturers: {
-            set: lecturerIds.map((id: string) => ({ id })), // Connects multiple lecturers securely
+            set: lecturerIds.map((id: string) => ({ id })),
           },
         },
       });
@@ -149,7 +157,31 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: 'Course lecturer roster updated successfully.' });
     }
 
-    // 3. RESOLVE COMPLAINT & OVERRIDE ATTENDANCE LOG (Updates CSV instantly for lecturers)
+    // 3. ASSIGN CARRYOVER / PUSH COURSE TO STUDENT
+    if (action === 'ASSIGN_CARRYOVER') {
+      const { studentId, courseId } = body;
+      if (!studentId || !courseId) {
+        return NextResponse.json({ error: 'Student ID and Course ID are required.' }, { status: 400 });
+      }
+
+      await db.courseEnrollment.upsert({
+        where: {
+          studentId_courseId: {
+            studentId,
+            courseId,
+          },
+        },
+        create: {
+          studentId,
+          courseId,
+        },
+        update: {},
+      });
+
+      return NextResponse.json({ success: true, message: 'Course successfully pushed to student schedule!' });
+    }
+
+    // 4. RESOLVE COMPLAINT & OVERRIDE ATTENDANCE LOG
     if (action === 'RESOLVE_COMPLAINT') {
       const { complaintId, resolutionNote, sessionId, studentId, overrideStatus } = body;
       if (!complaintId) {
@@ -165,7 +197,6 @@ export async function POST(req: Request) {
         },
       });
 
-      // If admin wants to override attendance status (e.g. mark PRESENT due to network failure)
       if (sessionId && studentId && overrideStatus) {
         await db.attendanceLog.upsert({
           where: { sessionId_studentId: { sessionId, studentId } },

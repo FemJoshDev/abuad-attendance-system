@@ -24,7 +24,7 @@ export default function LecturerDashboard() {
 
   const handleSignOut = async () => {
     const { signOut } = await import('next-auth/react');
-    await signOut({ callbackUrl: '/lecturer/login' });
+    await signOut({ callbackUrl: '/login' });
   };
 
   // Fetch the logged-in lecturer's live data on mount (and poll for live attendee counts)

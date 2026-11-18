@@ -46,23 +46,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Student record not found.' }, { status: 404 });
     }
 
-    // Ensure courseId is passed as an integer number to Prisma
-    const parsedCourseId = typeof courseId === 'string' ? parseInt(courseId, 10) : courseId;
+    // 2. Find the OPEN attendance session for this course (courseId is a String CUID, flag is isOpen)
+    const activeSession = await db.attendanceSession.findFirst({
+      where: {
+        courseId: String(courseId),
+        isOpen: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
 
-    // 2. Find the ACTIVE attendance session for this course opened by the lecturer
-    let activeSession: any = null;
-    try {
-      activeSession = await (db.attendanceSession as any).findFirst({
-        where: {
-          courseId: parsedCourseId,
-          status: 'ACTIVE',
-        },
-      });
-    } catch (dbErr) {
-      console.error('Error querying active session:', dbErr);
-    }
-
-    // Friendly error message if no session is active or open
     if (!activeSession) {
       return NextResponse.json(
         { error: 'Course attendance is not yet open by the lecturer.' },
@@ -86,7 +80,7 @@ export async function POST(req: Request) {
       activeSession.longitude
     );
 
-    const allowedRadius = activeSession.radiusMeters || 50; // default 50 meters
+    const allowedRadius = activeSession.radiusMeters || 50;
 
     // 5. Enforce Geofence Boundary
     if (distanceMeters > allowedRadius) {
@@ -113,7 +107,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 7. Success! Record attendance in PostgreSQL with GPS coordinates & distance
+    // 7. Record attendance in PostgreSQL with GPS coordinates & distance
     await db.attendanceLog.create({
       data: {
         sessionId: activeSession.id,

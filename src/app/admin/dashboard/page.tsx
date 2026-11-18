@@ -1,3 +1,4 @@
+// src/app/admin/dashboard/page.tsx
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({ totalUsers: 0, totalStudents: 0, totalLecturers: 0, activeCourses: 0 });
   
   const [staffList, setStaffList] = useState<any[]>([]);
+  const [studentsList, setStudentsList] = useState<any[]>([]);
   const [coursesList, setCoursesList] = useState<any[]>([]);
   const [complaints, setComplaints] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,16 +27,27 @@ export default function AdminDashboard() {
   const [role, setRole] = useState('LECTURER');
   const [department, setDepartment] = useState('College of Medicine & Health Sciences');
 
-  // Course assignment state (Supports multiple selected lecturers)
+  // Course assignment state
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [selectedLecturerIds, setSelectedLecturerIds] = useState<string[]>([]);
 
+  // Carryover assignment & search states
+  const [carryoverStudentId, setCarryoverStudentId] = useState('');
+  const [carryoverCourseId, setCarryoverCourseId] = useState('');
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [courseSearchQuery, setCourseSearchQuery] = useState('');
+
+  // CSV Bulk Upload state
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvPreviewCount, setCsvPreviewCount] = useState(0);
+  const [parsedCsvData, setParsedCsvData] = useState<any[]>([]);
+  const [uploadingCsv, setUploadingCsv] = useState(false);
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Safe client-only sign out handler to prevent build-time NextAuth URL crashes
   const handleSignOut = async () => {
     const { signOut } = await import('next-auth/react');
-    await signOut({ callbackUrl: '/admin/login' });
+    await signOut({ callbackUrl: '/login' });
   };
 
   const fetchData = async () => {
@@ -46,6 +59,7 @@ export default function AdminDashboard() {
         setAdminEmail(data.adminEmail);
         setStats(data.stats);
         setStaffList(data.staffList || []);
+        setStudentsList(data.studentsList || []);
         setCoursesList(data.coursesList || []);
         setComplaints(data.complaints || []);
       } else if (res.status === 401 || res.status === 403) {
@@ -107,6 +121,104 @@ export default function AdminDashboard() {
       }
     } catch (err) {
       console.error('Error assigning lecturers', err);
+    }
+  };
+
+  const handlePushCarryoverCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!carryoverStudentId || !carryoverCourseId) {
+      alert('Please select both a student and a course.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/dashboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'ASSIGN_CARRYOVER',
+          studentId: carryoverStudentId,
+          courseId: carryoverCourseId,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message);
+        setCarryoverStudentId('');
+        setCarryoverCourseId('');
+        setStudentSearchQuery('');
+        setCourseSearchQuery('');
+        fetchData();
+      } else {
+        alert(data.error || 'Failed to push course to student.');
+      }
+    } catch (err) {
+      console.error('Error pushing carryover course', err);
+    }
+  };
+
+  // CSV File Handler and Parser
+  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvFile(file);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split('\n').filter(l => l.trim() !== '');
+      if (lines.length < 2) {
+        alert('CSV file appears empty or missing headers.');
+        return;
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"(.*)"$/, '$1'));
+      const rows = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim().replace(/^"(.*)"$/, '$1'));
+        let obj: any = {};
+        headers.forEach((header, index) => {
+          obj[header] = values[index] || '';
+        });
+        return obj;
+      });
+
+      setParsedCsvData(rows);
+      setCsvPreviewCount(rows.length);
+    };
+    reader.readAsText(file);
+  };
+
+  // Submit CSV Courses to API
+  const handleUploadCsvSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (parsedCsvData.length === 0) {
+      alert('No course data found in CSV.');
+      return;
+    }
+
+    setUploadingCsv(true);
+    try {
+      const res = await fetch('/api/admin/courses/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ courses: parsedCsvData }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || 'Courses successfully uploaded!');
+        setCsvFile(null);
+        setParsedCsvData([]);
+        setCsvPreviewCount(0);
+        fetchData();
+      } else {
+        alert(data.error || 'Failed to upload courses.');
+      }
+    } catch (err) {
+      console.error('Error uploading CSV courses:', err);
+      alert('Network error during course upload.');
+    } finally {
+      setUploadingCsv(false);
     }
   };
 
@@ -179,6 +291,8 @@ export default function AdminDashboard() {
               <a href="#overview" onClick={() => setIsMobileMenuOpen(false)} className="block rounded-md bg-white/12 px-3 py-3 font-semibold">Dashboard</a>
               <a href="#staff" onClick={() => setIsMobileMenuOpen(false)} className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">Staff Accounts</a>
               <a href="#assignments" onClick={() => setIsMobileMenuOpen(false)} className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">Course Rosters</a>
+              <a href="#csv-upload" onClick={() => setIsMobileMenuOpen(false)} className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">CSV Course Upload</a>
+              <a href="#carryover" onClick={() => setIsMobileMenuOpen(false)} className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">Carryover Pushing</a>
               <a href="#reports" onClick={() => setIsMobileMenuOpen(false)} className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">Attendance Reports</a>
               <a href="#complaints" onClick={() => setIsMobileMenuOpen(false)} className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">Complaints &amp; Fixes</a>
             </nav>
@@ -199,6 +313,8 @@ export default function AdminDashboard() {
           <a href="#overview" className="block rounded-md bg-white/12 px-3 py-3 font-semibold">Dashboard</a>
           <a href="#staff" className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">Staff Accounts</a>
           <a href="#assignments" className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">Course Rosters</a>
+          <a href="#csv-upload" className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">CSV Course Upload</a>
+          <a href="#carryover" className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">Carryover Pushing</a>
           <a href="#reports" className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">Attendance Reports</a>
           <a href="#complaints" className="block rounded-md px-3 py-3 text-white/75 hover:bg-white/10 transition">Complaints &amp; Fixes</a>
         </nav>
@@ -230,7 +346,7 @@ export default function AdminDashboard() {
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#f0c3ca]">System command</p>
               <h2 className="mt-3 text-2xl font-medium">Administration Panel</h2>
-              <p className="mt-2 text-sm text-white/85">Manage multi-lecturer course assignments, resolve attendance disputes, and download master CSV logs.</p>
+              <p className="mt-2 text-sm text-white/85">Manage bulk course uploads, multi-lecturer assignments, carryover courses, and attendance disputes.</p>
             </div>
             <div className="min-w-44 rounded-lg border border-white/20 bg-white/10 px-5 py-4 text-center">
               <p className="text-[10px] uppercase tracking-wider text-white/75">Registered Users</p>
@@ -383,6 +499,118 @@ export default function AdminDashboard() {
             </section>
 
           </div>
+
+          {/* 3. Bulk Upload Courses via CSV */}
+          <section id="csv-upload" className="rounded-lg border border-[#ead9d5] bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-[#650019]">Bulk Upload Courses (CSV)</h2>
+            <p className="mb-5 mt-2 text-xs text-[#746d68]">
+              Upload a CSV file containing columns: <code className="bg-stone-100 px-1.5 py-0.5 rounded text-rose-800 font-mono">code, title, description, department, level, semester, units</code>
+            </p>
+
+            <form onSubmit={handleUploadCsvSubmit} className="space-y-4">
+              <label className="block text-xs font-medium text-[#514949]">Select CSV Course File
+                <input 
+                  type="file" 
+                  accept=".csv" 
+                  onChange={handleCsvFileChange}
+                  className="mt-1.5 block w-full text-sm text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#650019] file:text-white hover:file:bg-[#7b1730] cursor-pointer border border-[#ddd4ca] rounded-md p-1 bg-[#fbf9f0]" 
+                />
+              </label>
+
+              {csvPreviewCount > 0 && (
+                <div className="bg-[#fbf9f0] p-3 rounded text-xs text-stone-700 flex items-center justify-between border border-[#ead9d5]">
+                  <span>Ready to import <strong className="text-[#650019]">{csvPreviewCount}</strong> courses from CSV.</span>
+                  <span className="text-emerald-700 font-semibold">Valid format ✓</span>
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                disabled={uploadingCsv || csvPreviewCount === 0}
+                className="w-full rounded-md bg-[#650019] py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-[#7b1730] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-sm"
+              >
+                {uploadingCsv ? 'Importing Courses...' : 'Push CSV Courses to Database'}
+              </button>
+            </form>
+          </section>
+
+          {/* 4. Push Course / Carryover to Student with Working Search Filters */}
+          <section id="carryover" className="rounded-lg border border-[#ead9d5] bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-[#650019]">Push Course / Carryover to Student</h2>
+            <p className="mb-5 mt-2 text-xs text-[#746d68]">Manually assign a course to a student's schedule (for carryovers or cross-level registrations).</p>
+
+            <form onSubmit={handlePushCarryoverCourse} className="space-y-4">
+              
+              {/* Searchable Student Dropdown */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-[#514949]">Search &amp; Select Student</label>
+                <input 
+                  type="text"
+                  placeholder="Filter by student name, email, or matric number..."
+                  value={studentSearchQuery}
+                  onChange={(e) => setStudentSearchQuery(e.target.value)}
+                  className="w-full rounded-md border border-[#ddd4ca] px-3 py-2 text-xs bg-[#fbf9f0] focus:outline-none focus:ring-1 focus:ring-[#650019]"
+                />
+                <select 
+                  value={carryoverStudentId} 
+                  onChange={(e) => setCarryoverStudentId(e.target.value)} 
+                  required 
+                  className="w-full rounded-md border border-[#ddd4ca] px-3 py-2.5 text-sm mt-1"
+                >
+                  <option value="">-- Choose Student --</option>
+                  {studentsList
+                    .filter((s) => {
+                      const query = studentSearchQuery.toLowerCase();
+                      const name = (s.fullName || '').toLowerCase();
+                      const matric = (s.matricNumber || '').toLowerCase();
+                      const email = (s.email || '').toLowerCase();
+                      return name.includes(query) || matric.includes(query) || email.includes(query);
+                    })
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.fullName} ({s.matricNumber || s.email}) - {s.level}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              {/* Searchable Course Dropdown */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-[#514949]">Search &amp; Select Course to Push</label>
+                <input 
+                  type="text"
+                  placeholder="Filter by course code or title (e.g., CHM101)..."
+                  value={courseSearchQuery}
+                  onChange={(e) => setCourseSearchQuery(e.target.value)}
+                  className="w-full rounded-md border border-[#ddd4ca] px-3 py-2 text-xs bg-[#fbf9f0] focus:outline-none focus:ring-1 focus:ring-[#650019]"
+                />
+                <select 
+                  value={carryoverCourseId} 
+                  onChange={(e) => setCarryoverCourseId(e.target.value)} 
+                  required 
+                  className="w-full rounded-md border border-[#ddd4ca] px-3 py-2.5 text-sm mt-1"
+                >
+                  <option value="">-- Choose Course --</option>
+                  {coursesList
+                    .filter((c) => {
+                      const query = courseSearchQuery.toLowerCase();
+                      const code = (c.code || '').toLowerCase();
+                      const title = (c.title || '').toLowerCase();
+                      return code.includes(query) || title.includes(query);
+                    })
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.code}: {c.title} ({c.level})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <button type="submit" className="w-full rounded-md bg-[#650019] py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-[#7b1730] cursor-pointer shadow-sm">
+                Push Course to Student Schedule
+              </button>
+            </form>
+          </section>
 
           {/* Closed Attendance Reports & CSV Downloads */}
           <section id="reports" className="rounded-lg border border-[#ead9d5] bg-white p-6 shadow-sm overflow-hidden">

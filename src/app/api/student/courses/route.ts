@@ -9,7 +9,7 @@ const formatSemester = (semester: string) => {
   return semester === 'SECOND' ? 'Second Semester' : 'First Semester';
 };
 
-// 1. GET: Fetch master course catalog and student's current enrollments
+// 1. GET: Fetch master course catalog, student's current enrollments, and admin-pushed carryovers
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -38,19 +38,26 @@ export async function GET() {
       return NextResponse.json({ error: 'Student profile not found' }, { status: 404 });
     }
 
-    // Fetch active courses matching the student's level and department (or general/elective courses)
+    // Get all course IDs the student is explicitly enrolled in (includes admin-pushed carryovers)
+    const studentEnrollments = await db.courseEnrollment.findMany({
+      where: { studentId: student.id },
+      select: { courseId: true },
+    });
+    const enrolledCourseIds = new Set(studentEnrollments.map((e: any) => e.courseId));
+
+    // Fetch active courses matching the student's level/department OR explicitly enrolled carryovers
     const allCourses: any[] = await (db.course as any).findMany({
       where: {
         isActive: true,
-        ...(student.level ? { level: student.level } : {}),
         OR: [
-          ...(student.department ? [{ department: student.department }] : []),
+          ...(student.level ? [{ level: student.level }] : []),
+          { id: { in: Array.from(enrolledCourseIds) } }, // Includes admin-pushed carryovers outside standard level!
           { department: null },
           { department: 'GENERAL' },
         ],
       },
       include: {
-        lecturers: true, // Updated from 'lecturer' to match the multi-lecturer schema relation
+        lecturers: true, // Multi-lecturer schema relation support
         attendanceSessions: {
           include: {
             logs: {
@@ -60,11 +67,6 @@ export async function GET() {
         },
       },
     });
-
-    // Set of course IDs the student is currently enrolled in
-    const enrolledCourseIds = new Set(
-      (student.enrollments || []).map((e: any) => e.courseId)
-    );
 
     const catalogWithStatus = allCourses.map((course: any) => {
       const isEnrolled = enrolledCourseIds.has(course.id);
